@@ -582,6 +582,10 @@ jobs:
             override fun onDestroy() { player?.release(); player = null; super.onDestroy() }
           }
           KT_EOF
+          
+          # إصلاح خطأ Type mismatch في ExoPlayer
+          sed -i 's/PlayerView.switchTargetView(player,/PlayerView.switchTargetView(player!!,/g' app/src/main/java/com/nova/play/MainActivity.kt
+          
           gradle wrapper --gradle-version 8.5
           chmod +x gradlew
           ./gradlew :app:assembleDebug --no-daemon
