@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.3"
-      VERSION_CODE: "83"
+      VERSION_NAME: "8.4"
+      VERSION_CODE: "84"
     steps:
       - uses: actions/checkout@v4
 
@@ -126,8 +126,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 83)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.3")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 84)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.4")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -181,6 +181,9 @@ jobs:
               implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
               implementation 'androidx.media3:media3-exoplayer:1.2.1'
               implementation 'androidx.media3:media3-exoplayer-hls:1.2.1'
+              implementation 'androidx.media3:media3-exoplayer-dash:1.2.1'
+              implementation 'androidx.media3:media3-exoplayer-smoothstreaming:1.2.1'
+              implementation 'androidx.media3:media3-exoplayer-rtsp:1.2.1'
               implementation 'androidx.media3:media3-ui:1.2.1'
               implementation 'androidx.mediarouter:mediarouter:1.6.0'
               implementation 'com.github.bumptech.glide:glide:4.16.0'
@@ -235,6 +238,7 @@ jobs:
                       android:name=".LiveActivity"
                       android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode"
                       android:exported="false"
+                      android:launchMode="singleTask"
                       android:screenOrientation="sensorLandscape"
                       android:theme="@style/ThemeNova" />
 
@@ -913,7 +917,8 @@ jobs:
               android:layout_width="match_parent" android:layout_height="match_parent" android:layoutDirection="rtl" android:background="@drawable/bg_crystal">
               <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
                   <LinearLayout android:layout_width="match_parent" android:layout_height="52dp" android:orientation="horizontal" android:gravity="center_vertical" android:paddingStart="12dp" android:paddingEnd="12dp">
-                      <Button android:id="@+id/btn_grid_back" android:layout_width="wrap_content" android:layout_height="38dp" android:text="رجوع" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
+                      <TextView android:layout_width="wrap_content" android:layout_height="38dp" android:gravity="center"
+                          android:text="⌫ رجوع بالزر" android:textColor="@color/np_text_dim" android:textSize="11sp" android:paddingStart="6dp" android:paddingEnd="6dp"/>
                       <TextView android:id="@+id/grid_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center"
                           android:textColor="@color/np_gold" android:textSize="16sp" android:textStyle="bold"/>
                       <EditText android:id="@+id/et_grid_search" android:layout_width="200dp" android:layout_height="38dp" android:background="@drawable/input_gold"
@@ -1159,8 +1164,6 @@ jobs:
                       <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="14dp">
                           <Button android:id="@+id/btn_login" android:layout_width="0dp" android:layout_height="46dp" android:layout_weight="1"
                               android:text="دخول" android:background="@drawable/btn_gold" android:textColor="@color/np_bg"/>
-                          <Button android:id="@+id/btn_login_back" android:layout_width="0dp" android:layout_height="46dp" android:layout_weight="1"
-                              android:layout_marginStart="8dp" android:text="رجوع" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
                       </LinearLayout>
                       <TextView android:id="@+id/tv_login_status" android:layout_width="match_parent" android:layout_height="wrap_content"
                           android:layout_marginTop="10dp" style="@style/NovaSmall"/>
@@ -1190,8 +1193,6 @@ jobs:
                               android:text="اتصال" android:background="@drawable/btn_gold" android:textColor="@color/np_bg"/>
                           <Button android:id="@+id/btn_saved" android:layout_width="0dp" android:layout_height="46dp" android:layout_weight="1"
                               android:layout_marginStart="8dp" android:text="السيرفرات المحفوظة" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
-                          <Button android:id="@+id/btn_server_back" android:layout_width="0dp" android:layout_height="46dp" android:layout_weight="0.5"
-                              android:layout_marginStart="8dp" android:text="رجوع" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
                       </LinearLayout>
                       <TextView android:id="@+id/tv_server_status" android:layout_width="wrap_content" android:layout_height="wrap_content"
                           android:layout_marginTop="10dp" style="@style/NovaSmall"/>
@@ -2025,6 +2026,7 @@ jobs:
           import android.os.Handler
           import android.os.Looper
           import android.view.View
+          import android.view.WindowManager
           import android.view.inputmethod.InputMethodManager
           import android.widget.EditText
           import android.view.ViewGroup
@@ -2380,6 +2382,47 @@ jobs:
               fun set(pct: Int, txt: String) = try { bar.progress = pct; tv.text = txt } catch (t: Throwable) {}
               fun close() = try { dlg.dismiss() } catch (t: Throwable) {}
           }
+
+          /* ============================ ملء الشاشة بالكامل ============================ */
+
+          /**
+           * يخفي شريط الحالة وشريط التنقل ويرسم خلف النوتش.
+           * الهاتف والتلفاز، Android 5 (API 21) حتى 14: systemUiVisibility للقديم
+           * و WindowInsetsControllerCompat لـ Android 11+.
+           */
+          fun Activity.goImmersive() {
+              val w = window
+              try { androidx.core.view.WindowCompat.setDecorFitsSystemWindows(w, false) } catch (t: Throwable) {}
+              if (Build.VERSION.SDK_INT >= 27) {
+                  try {
+                      val lp = w.attributes
+                      lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                      w.attributes = lp
+                  } catch (t: Throwable) {}
+              }
+              if (Build.VERSION.SDK_INT >= 30) {
+                  try {
+                      val c = androidx.core.view.WindowInsetsControllerCompat(w, w.decorView)
+                      c.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                      c.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+                  } catch (t: Throwable) {}
+              } else {
+                  try {
+                      @Suppress("DEPRECATION")
+                      w.decorView.systemUiVisibility = (View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                          or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                          or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN
+                          or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
+                  } catch (t: Throwable) {}
+              }
+              try { w.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) } catch (t: Throwable) {}
+          }
+
+          /** جهاز تلفاز؟ (ريموت، أشرطة تحكم لا تختفي سريعًا) */
+          fun Activity.isTvDevice(): Boolean = try {
+              packageManager.hasSystemFeature("android.software.leanback") ||
+                  packageManager.hasSystemFeature("android.software.leanback_only")
+          } catch (t: Throwable) { false }
           NP_EOF
           cat <<'NP_EOF' > app/src/main/java/com/nova/play/GridActivity.kt
           package com.nova.play
@@ -2433,6 +2476,7 @@ jobs:
               override fun onCreate(b: Bundle?) {
                   super.onCreate(b)
                   setContentView(R.layout.activity_grid)
+                  goImmersive()
                   kind = intent.getStringExtra("kind") ?: "movie"
                   title = findViewById(R.id.grid_title)
                   etSearch = findViewById(R.id.et_grid_search)
@@ -2440,7 +2484,6 @@ jobs:
                   busyTxt = findViewById(R.id.gridBusyTxt)
                   rvGrid = findViewById(R.id.rv_grid)
                   rvCats = findViewById(R.id.rv_ggroups)
-                  findViewById<Button>(R.id.btn_grid_back).setOnClickListener { back() }
 
                   decodeChans(sp.s("favs"), favs)
                   val span = Math.max(3, resources.displayMetrics.widthPixels / (resources.displayMetrics.density * 130).toInt())
@@ -2622,6 +2665,8 @@ jobs:
 
               private fun playNow(c: Channel) {
                   val i = Intent(this, LiveActivity::class.java)
+                  // نسخة واحدة من شاشة التشغيل: لا يبقى صوت القناة يعمل خلف الفيلم
+                  i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                   i.putExtra("play", if (c.url.isNotBlank()) c.url else c.alt)
                   i.putExtra("title", c.name)
                   i.putExtra("kind", c.kind)
@@ -2639,6 +2684,16 @@ jobs:
               }
 
               override fun onBackPressed() = back()
+
+              override fun onResume() {
+                  super.onResume()
+                  goImmersive()
+              }
+
+              override fun onWindowFocusChanged(hasFocus: Boolean) {
+                  super.onWindowFocusChanged(hasFocus)
+                  if (hasFocus) goImmersive()
+              }
 
               private fun toggleFav(c: Channel) {
                   val i = favs.indexOfFirst { it.url == c.url }
@@ -2761,7 +2816,15 @@ jobs:
           import androidx.media3.common.TrackSelectionOverride
           import androidx.media3.common.Tracks
           import androidx.media3.common.VideoSize
+          import androidx.media3.datasource.DataSource
           import androidx.media3.datasource.DefaultHttpDataSource
+          import androidx.media3.datasource.UdpDataSource
+          import androidx.media3.exoplayer.dash.DashMediaSource
+          import androidx.media3.exoplayer.hls.HlsMediaSource
+          import androidx.media3.exoplayer.rtsp.RtspMediaSource
+          import androidx.media3.exoplayer.smoothstreaming.SsMediaSource
+          import androidx.media3.exoplayer.source.MediaSource
+          import androidx.media3.exoplayer.source.ProgressiveMediaSource
           import androidx.media3.exoplayer.DefaultLoadControl
           import androidx.media3.exoplayer.ExoPlayer
           import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -2805,6 +2868,7 @@ jobs:
               private val speeds = floatArrayOf(0.75f, 1f, 1.25f, 1.5f, 2f)
               private var speedIdx = 1
               private var resizeIdx = 0
+              private var tv = false
 
               private val shown = ArrayList<Channel>()
               private val groups = ArrayList<Group>()
@@ -2858,6 +2922,7 @@ jobs:
                   super.onCreate(b)
                   window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                   setContentView(R.layout.activity_live)
+                  goImmersive()
                   bind()
                   buildPlayer()
                   decodeChans(sp.s("favs"), favs)
@@ -2865,6 +2930,11 @@ jobs:
                   loadMine()
                   autoNext = sp.b("auto_next", true)
                   bgPlay = sp.b("bg_play", false)
+                  tv = isTvDevice()
+                  try {
+                      pv.controllerShowTimeoutMs = if (tv) 0 else 4000
+                      pvFull.controllerShowTimeoutMs = if (tv) 0 else 4000
+                  } catch (t: Throwable) {}
                   buildGroups()
                   rvChannels.adapter = chanAdapter
                   rvGroups.adapter = grpAdapter
@@ -2931,6 +3001,33 @@ jobs:
                   } catch (t: Throwable) { Crash.log(t) }
               }
 
+              override fun onStop() {
+                  super.onStop()
+                  // لا صوت خارج التطبيق
+                  if (!bgPlay) stopAllPlayback()
+              }
+
+              override fun onWindowFocusChanged(hasFocus: Boolean) {
+                  super.onWindowFocusChanged(hasFocus)
+                  if (hasFocus) goImmersive()
+              }
+
+              /** فتح فيلم/حلقة من أي شاشة: نفس النشاط ومشغّل واحد، بلا تداخل صوت. */
+              override fun onNewIntent(i: Intent?) {
+                  super.onNewIntent(i)
+                  setIntent(i)
+                  val direct = i?.getStringExtra("play")
+                  if (!direct.isNullOrBlank()) {
+                      stopAllPlayback()
+                      val c = Channel().apply {
+                          name = i.getStringExtra("title") ?: "تشغيل"
+                          url = direct
+                          kind = i.getStringExtra("kind") ?: "movie"
+                      }
+                      play(c, true)
+                  }
+              }
+
               override fun onDestroy() {
                   stopTicker(); clearWd()
                   try { player?.removeListener(this) } catch (t: Throwable) {}
@@ -2963,6 +3060,8 @@ jobs:
                       .setLoadControl(load)
                       .setAudioAttributes(AudioAttributes.DEFAULT, true)   // يوقف عند مكالمة/فقدان التركيز الصوتي
                       .setHandleAudioBecomingNoisy(true)                   // يوقف عند نزع السماعة
+                      .setSeekBackIncrementMs(10000)
+                      .setSeekForwardIncrementMs(30000)
                       .build()
                   p.playWhenReady = true
                   player = p
@@ -2981,7 +3080,63 @@ jobs:
                   } catch (t: Throwable) { Crash.log(t) }
               }
 
+              /** مشغّل واحد فقط: قبل أي تشغيل جديد نوقف كل ما هو قائم (صوت القناة يختفي فورًا). */
+              private fun stopAllPlayback() {
+                  try {
+                      val p = player
+                      if (p != null) { p.pause(); p.stop() }
+                  } catch (t: Throwable) { Crash.log(t) }
+                  wasPlaying = false
+                  dial.setLength(0)
+              }
+
+              /** بروتوكولات لا يقرأها media3 (RTMP/RTMPS/MMS) → مشغّل خارجي احترافي إن وُجد. */
+              private fun openExternal(title: String, url: String) {
+                  if (url.isBlank()) { toast("لا يوجد رابط"); return }
+                  stopAllPlayback()
+                  try {
+                      val i = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                      i.setType("video/*")
+                      i.putExtra("title", title)
+                      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                      startActivity(i)
+                      toast("فُتح في مشغّل خارجي: " + title)
+                  } catch (t: Throwable) {
+                      toast("لا يوجد مشغّل خارجي يقرأ هذا البروتوكول — جرّب MX Player أو VLC")
+                  }
+              }
+
+              /** المصدر حسب البروتوكول: HLS / DASH / Smooth / RTSP / UDP multicast / MP4-MKV-TS. */
+              private fun makeSource(url: String, item: MediaItem): MediaSource {
+                  val http = DefaultHttpDataSource.Factory()
+                      .setUserAgent(Http.UA)
+                      .setAllowCrossProtocolRedirects(true)
+                      .setConnectTimeoutMs(15000)
+                      .setReadTimeoutMs(22000)
+                      .setDefaultRequestProperties(mapOf("Accept" to "*/*"))
+                  val u = url.lowercase()
+                  return when {
+                      u.startsWith("rtsp://") || u.startsWith("rtspt://") || u.startsWith("rtspu://") ->
+                          RtspMediaSource.Factory().setUserAgent(Http.UA).setTimeoutMs(20000).createMediaSource(item)
+                      u.startsWith("udp://") || u.startsWith("udp2://") || u.startsWith("rtp://") -> {
+                          val udp = UdpDataSource(20000)
+                          ProgressiveMediaSource.Factory(DataSource.Factory { udp }).createMediaSource(item)
+                      }
+                      u.contains(".m3u8") || u.contains("m3u8?") || u.contains("mpegurl") ->
+                          HlsMediaSource.Factory(http).setAllowChunklessPreparation(true).createMediaSource(item)
+                      u.contains(".mpd") -> DashMediaSource.Factory(http).createMediaSource(item)
+                      u.contains(".ism") || u.contains("smooth") -> SsMediaSource.Factory(http).createMediaSource(item)
+                      else -> DefaultMediaSourceFactory(http).createMediaSource(item)
+                  }
+              }
+
+              /** يطبّق المصدر على المشغّل الواحد، ومع رجوع آمن إلى setMediaItem. */
+              private fun applySource(p: ExoPlayer, url: String, item: MediaItem) {
+                  try { p.setMediaSource(makeSource(url, item)) } catch (t: Throwable) { Crash.log(t); p.setMediaItem(item) }
+              }
+
               private fun play(c: Channel, asFull: Boolean) {
+                  if (c !== cur) stopAllPlayback()
                   cur = c
                   retries = 0
                   usingAlt = false
@@ -2993,7 +3148,7 @@ jobs:
                   if (prof?.type == "mac" && !url.startsWith("http")) {
                       busy(true, "تجهيز رابط البوابة…")
                       val f = url
-                      Loader.macPlayable(prof, f) { real ->
+                      Loader.macPlayable(prof, c.kind, f) { real ->
                           runOnUiThread {
                               busy(false, "")
                               if (real.isBlank() || real == f) { toast("البوابة لم ترجع رابطاً صالحاً"); return@runOnUiThread }
@@ -3007,6 +3162,11 @@ jobs:
               }
 
               private fun startUrl(c: Channel, url: String, asFull: Boolean) {
+                  val low = url.lowercase()
+                  if (low.startsWith("rtmp") || low.startsWith("mms") || low.startsWith("rtmpt")) {
+                      openExternal(c.name, url)
+                      return
+                  }
                   infoName.text = c.name
                   infoSub.text = listOfNotNull(
                       if (c.group.isBlank()) null else c.group,
@@ -3016,12 +3176,13 @@ jobs:
                   val meta = MediaMetadata.Builder().setTitle(c.name).build()
                   val item = MediaItem.Builder().setUri(url).setMediaMetadata(meta).build()
                   lastItem = item
-                  player?.stop()
-                  player?.setMediaItem(item)
-                  player?.prepare()
-                  player?.play()
+                  val p0 = player ?: return
+                  try { p0.stop() } catch (t: Throwable) {}
+                  applySource(p0, url, item)
+                  p0.prepare()
+                  p0.play()
                   applyTrackPrefs()
-                  player?.setPlaybackSpeed(speeds[speedIdx])
+                  try { p0.setPlaybackSpeed(speeds[speedIdx]) } catch (t: Throwable) {}
                   if (asFull && !full) toggleFull(true)
                   if (!full) { dockBusy.visibility = View.VISIBLE; tvLoadPct.text = "0%" }
                   else { fullBusy.visibility = View.VISIBLE; tvFullPct.text = "0%" }
@@ -3038,7 +3199,10 @@ jobs:
                   retries = 0
                   infoDesc.text = "تجربة المصدر البديل…"
                   val item = MediaItem.Builder().setUri(c.alt).setMediaMetadata(MediaMetadata.Builder().setTitle(c.name).build()).build()
-                  player?.stop(); player?.setMediaItem(item); player?.prepare(); player?.play()
+                  val pa = player ?: return
+                  try { pa.stop() } catch (t: Throwable) {}
+                  applySource(pa, c.alt, item)
+                  pa.prepare(); pa.play()
                   armWd(); toast("المصدر البديل قيد التجربة")
               }
 
@@ -3049,6 +3213,7 @@ jobs:
                       fullBox.visibility = View.VISIBLE
                       try { PlayerView.switchTargetView(p, pv, pvFull) } catch (t: Throwable) { Crash.log(t) }
                       fullTitle.text = cur?.name ?: ""
+                      try { pvFull.requestFocus() } catch (t: Throwable) {}
                       hideBarsSoon()
                   } else {
                       fullBox.visibility = View.GONE
@@ -3058,7 +3223,8 @@ jobs:
 
               private fun hideBarsSoon() {
                   h.removeCallbacks(hideBar)
-                  h.postDelayed(hideBar, 3500)
+                  // على التلفاز الأشرطة تبقى أطول لأن الريموت لا يوقظها باللمس
+                  h.postDelayed(hideBar, if (tv) 9000 else 3500)
               }
 
               private val hideBar = Runnable {
@@ -3561,7 +3727,8 @@ jobs:
                       "إعادة تحميل القائمة",
                       "معلومات الجلسة والحساب",
                       "تغيير رمز القفل",
-                      "مسح السجل"
+                      "مسح السجل",
+                      "مشغّل خارجي للعنصر الحالي"
                   )
                   pickDialog("الإعدادات السريعة", items) { i ->
                       when (i) {
@@ -3588,6 +3755,7 @@ jobs:
                               if (code.length >= 3) { sp.put("lock_code", code); toast("تم تغيير الرمز") } else toast("قصير جدًا")
                           }
                           9 -> { recents.clear(); sp.put("recents", "[]"); buildGroups(); refresh(); toast("مُسح السجل") }
+                          10 -> { val c = cur; if (c == null) toast("لا يوجد عنصر قيد التشغيل") else openExternal(c.name, c.url.ifBlank { c.alt }) }
                       }
                   }
               }
@@ -3618,6 +3786,15 @@ jobs:
                           val p = player ?: return false
                           if (p.isPlaying) p.pause() else p.play()
                           return true
+                      }
+                      KeyEvent.KEYCODE_MENU -> { settingsDialog(); return true }
+                      KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                          if (full) {
+                              val p = player ?: return false
+                              if (p.isPlaying) p.pause() else p.play()
+                              showBars()
+                              return true
+                          }
                       }
                       KeyEvent.KEYCODE_MEDIA_NEXT -> { next(false); return true }
                       KeyEvent.KEYCODE_MEDIA_PREVIOUS -> { prev(); return true }
@@ -3928,6 +4105,7 @@ jobs:
                   super.onCreate(savedInstanceState)
                   window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                   setContentView(R.layout.activity_main)
+                  goImmersive()
                   bind()
                   ensureSession()
                   askNotifPermission()
@@ -4021,7 +4199,6 @@ jobs:
                   }
 
                   findViewById<Button>(R.id.btn_login).setOnClickListener { doLogin() }
-                  findViewById<Button>(R.id.btn_login_back).setOnClickListener { show("gate") }
                   findViewById<TextView>(R.id.cb_auto).setOnClickListener {
                       autoLogin = !autoLogin
                       (it as TextView).text = if (autoLogin) "☑ دخول تلقائي عند التشغيل" else "☐ دخول تلقائي عند التشغيل"
@@ -4033,7 +4210,6 @@ jobs:
 
                   findViewById<Button>(R.id.btn_connect).setOnClickListener { connect() }
                   findViewById<Button>(R.id.btn_saved).setOnClickListener { savedServers() }
-                  findViewById<Button>(R.id.btn_server_back).setOnClickListener { show(if (sp.s("auth_user").isNotEmpty()) "home" else "gate") }
 
                   findViewById<View>(R.id.tile_live).setOnClickListener { openLive() }
                   findViewById<View>(R.id.tile_movies).setOnClickListener { openGrid("movie") }
@@ -4363,6 +4539,11 @@ jobs:
                   }
               }
 
+              override fun onWindowFocusChanged(hasFocus: Boolean) {
+                  super.onWindowFocusChanged(hasFocus)
+                  if (hasFocus) goImmersive()
+              }
+
               override fun onBackPressed() {
                   when {
                       busyBox.visibility == View.VISIBLE -> cancelLoad()
@@ -4612,9 +4793,13 @@ jobs:
           }
 
           /**
-           * عميل بوابات MAC / Stalker (load.php).
-           * يطابق دالة البوابة الحقيقية: handshake(pre_auth) → get_profile(result.status) → البوابات،
-           * مع نسختين من الترويسات (بعض البوابات ترفض النسخة القياسية) و create_link لتشغيل الروابط الداخلية.
+           * عميل بوابات MAC / Stalker (load.php) — يطابق دوال البوابة المطلوبة:
+           *  handshake?pre_auth=1&mac=  →  js.token
+           *  get_profile                 →  result.status == "1"
+           *  type=itv|vod|series&action=get_categories          → js[] (id, title)
+           *  type=...&action=get_ordered_list&category=<id>&p=N → js.data[]
+           *  type=series&action=get_series_info&movie_id=<id>   → js.series{season}.series[]
+           * ترويسات: Authorization: Bearer <token> + X-User-Agent: Mozilla/5.0 (QtEmbedded; Linux; C)
            */
           class Stalker(private val baseIn: String, private val mac: String) {
               private val base = baseIn.trimEnd('/')
@@ -4630,163 +4815,159 @@ jobs:
               var totalItems = 0
                   private set
 
-              /** 0 = الترويسات القياسية لجهاز STB، 1 = النسخة المقلوبة التي تستعملها بعض البوابات. */
+              /** 0 = ترويسات STB القياسية، 1 = ترويسات أنعم لبعض البوابات. */
               private var variant = 0
               private var probed = false
+              private var withJsHttp = false
+              private val filterDone = HashSet<String>()
 
-              private fun headers(auth: Boolean = true): Map<String, String> {
+              private fun headers(auth: Boolean): Map<String, String> {
                   val m = HashMap<String, String>()
+                  m["X-User-Agent"] = "Mozilla/5.0 (QtEmbedded; Linux; C)"
                   m["Cookie"] = "mac=$mac; stb_lang=ar; timezone=Europe/Paris"
+                  m["Accept"] = "application/json, text/plain, */*"
                   if (variant == 0) {
                       m["User-Agent"] = "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3"
-                      m["X-User-Agent"] = "Model: MAG250; Link: WiFi"
                   } else {
-                      m["User-Agent"] = "Mozilla/5.0 (Linux armv7l) gsoap/2.8 (STB, Linux) Qt/4.8"
-                      m["X-User-Agent"] = "Mozilla/5.0 (QtEmbedded; Linux; C)"
+                      m["User-Agent"] = "Mozilla/5.0 (Linux; Android 9; SM-T825) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36"
                   }
                   if (auth && token.isNotEmpty()) m["Authorization"] = "Bearer $token"
-                  m["Accept"] = "application/json, text/plain, */*"
                   return m
               }
 
-              /** رابط +JsHttpRequest، مع إعادة محاولة بالترويسات الأخرى عند الفشل. */
-              private fun raw(path: String, auth: Boolean): String {
-                  val u = if (path.contains("JsHttpRequest")) path else "$path&JsHttpRequest=1-xml"
-                  val url = "$base/server/load.php?$u"
-                  return try {
-                      Http.read(url, headers(auth), timeoutMs = 14000, retries = 1)
-                  } catch (t: Throwable) {
-                      lastError = t.message ?: t.javaClass.simpleName
-                      throw t
-                  }
+              private fun urlOf(path: String): String {
+                  val q = if (path.contains("JsHttpRequest")) path else if (withJsHttp) "$path&JsHttpRequest=1-xml" else path
+                  return "$base/server/load.php?$q"
               }
 
-              /** قراءة مع تبديل تلقائي لنسخة الترويسات إذا رفضت البوابة الأولى. */
+              /** GET مع إعادة محاولة على ترويسات أخرى ثم على صيغة JsHttpRequest. */
               private fun get(path: String, auth: Boolean = true): String? {
-                  return try {
-                      raw(path, auth)
-                  } catch (t: Throwable) {
-                      if (variant == 0) {
-                          variant = 1
-                          try { raw(path, auth) } catch (t2: Throwable) { variant = 0; null }
-                      } else null
+                  val tries = ArrayList<Array<Any>>()
+                  for (v in intArrayOf(variant, if (variant == 0) 1 else 0)) for (jsFlag in booleanArrayOf(withJsHttp, !withJsHttp)) {
+                      tries.add(arrayOf(v, jsFlag))
                   }
+                  var last: Throwable? = null
+                  for (t in tries) {
+                      variant = t[0] as Int
+                      withJsHttp = t[1] as Boolean
+                      try {
+                          val r = Http.read(urlOf(path), headers(auth), timeoutMs = 15000, retries = 1)
+                          if (r.isNotBlank() && (r.trimStart().startsWith("{") || r.trimStart().startsWith("[") || r.contains("\"js\""))) {
+                              withJsHttp = t[1] as Boolean
+                              return r
+                          }
+                          last = java.io.IOException("رد غير متوقع من البوابة")
+                      } catch (e: Throwable) { last = e }
+                  }
+                  variant = 0
+                  lastError = last?.message ?: "لا رد من البوابة"
+                  return null
               }
 
-              // ----------------------------- التحليل -----------------------------
+              // ----------------------------- تحليل JSON -----------------------------
 
-              /** يعيد عقدة البيانات أياً كان شكلها: js / result / js.data / المتجذر. */
+              /** عقدة البيانات: js ثم result ثم المتجذر. */
               private fun node(json: String?): Any? {
                   if (json.isNullOrBlank()) return null
                   return try {
                       val o = JSONObject(json)
                       when {
-                          o.optJSONObject("js") != null -> o.optJSONObject("js")
-                          o.optJSONArray("js") != null -> o.optJSONArray("js")
-                          o.optJSONObject("result") != null -> o.optJSONObject("result")
-                          o.optJSONArray("result") != null -> o.optJSONArray("result")
+                          o.opt("js") != null -> o.opt("js")
+                          o.opt("result") != null -> o.opt("result")
                           else -> o
                       }
-                  } catch (t: Throwable) {
-                      json.takeIf { it.trim().startsWith("http") }
-                  }
+                  } catch (t: Throwable) { null }
               }
 
-              /** قائمة العناصر داخل أي مخطط (data / list / categories / array مباشر). */
+              /** مصفوفة العناصر: js[] مباشرة أو js.data أو js.list أو js.categories أو map id→عنصر. */
               private fun items(json: String?): List<JSONObject> {
                   val out = ArrayList<JSONObject>()
-                  var n: Any? = node(json)
-                  val o = n as? JSONObject
-                  if (o != null) {
-                      var arr: JSONArray? = null
-                      for (k in listOf("data", "list", "categories", "channels", "items")) {
-                          val a = o.optJSONArray(k)
-                          if (a != null && a.length() > 0) { arr = a; break }
-                      }
-                      if (arr == null) {
-                          // get_filter: التصنيفات داخل filters
-                          val f = o.optJSONObject("filters")
-                          if (f != null) arr = f.optJSONArray("categories") ?: f.optJSONArray("genres")
-                      }
-                      if (arr != null) n = arr
-                      if (arr == null && o.length() > 0 && o.optJSONArray("data") == null) {
-                          // خريطة id → {title}
-                          val keys = o.keys()
-                          while (keys.hasNext()) {
-                              val k = keys.next()
-                              val v = o.opt(k)
-                              if (v is JSONObject) {
-                                  if (v.optString("id").isBlank() && v.optString("title").isNotBlank()) v.put("id", k)
-                                  out.add(v)
-                              }
-                          }
-                          if (out.isNotEmpty()) return out
+                  val n = node(json)
+                  if (n is JSONArray) {
+                      for (i in 0 until n.length()) { val o = n.optJSONObject(i); if (o != null) out.add(o) }
+                      return out
+                  }
+                  val o = n as? JSONObject ?: return out
+                  for (k in arrayOf("data", "list", "categories", "channels", "items")) {
+                      val a = o.optJSONArray(k)
+                      if (a != null) { for (i in 0 until a.length()) { val e = a.optJSONObject(i); if (e != null) out.add(e) } ; return out }
+                  }
+                  val keys = o.keys()
+                  while (keys.hasNext()) {
+                      val k = keys.next()
+                      val v = o.opt(k)
+                      if (v is JSONObject) {
+                          if (v.optString("id").isBlank() && (v.optString("title").isNotBlank() || v.optString("name").isNotBlank())) v.put("id", k)
+                          out.add(v)
                       }
                   }
-                  val a = n as? JSONArray
-                  if (a != null) {
-                      for (i in 0 until a.length()) {
-                          val o2 = a.optJSONObject(i)
-                          if (o2 != null) out.add(o2)
-                      }
-                  } else if (o != null && out.isEmpty()) out.add(o)
+                  if (out.isEmpty() && o.length() > 0 && o.optString("name").isNotBlank()) out.add(o)
                   return out
               }
 
               private fun totalOf(json: String?) {
                   totalPages = 1; totalItems = 0
-                  val n = node(json) as? JSONObject ?: return
-                  totalItems = n.optInt("total", n.optInt("pages", 0))
-                  val tp = n.opt("totalPages")
-                  when (tp) {
-                      is Int -> totalPages = tp
-                      is String -> totalPages = tp.toIntOrNull() ?: 1
+                  val o = node(json) as? JSONObject ?: return
+                  if (o.has("totalPages")) {
+                      val tp = o.opt("totalPages")
+                      totalPages = when (tp) {
+                          is Int -> tp
+                          is String -> tp.toIntOrNull() ?: 1
+                          else -> 1
+                      }
+                  }
+                  val t = o?.optJSONObject("total")
+                  totalItems = when {
+                      t != null -> t.optInt("pages", t.optInt("total", 0))
+                      else -> o?.optInt("total", 0) ?: 0
                   }
                   if (totalPages < 1) totalPages = 1
               }
 
+              private fun str(o: JSONObject, vararg keys: String): String {
+                  for (k in keys) { val v = o.optString(k); if (v.isNotBlank()) return v }
+                  return ""
+              }
+
               // ----------------------------- الاتصال -----------------------------
 
-              /** handshake ثم get_profile. يعيد true إذا تم obtaining token صالح. */
+              /** handshake → token → get_profile (result.status == "1"). */
               fun connect(): Boolean {
                   if (probed) return token.isNotEmpty()
                   probed = true
-                  val paths = listOf(
+                  val hs = listOf(
                       "type=stb&action=handshake&pre_auth=1&mac=$mac",
                       "type=stb&action=handshake&token=&mac=$mac",
                       "type=stb&action=handshake&mac=$mac"
                   )
-                  for (v in intArrayOf(0, 1)) {
-                      variant = v
-                      for (pth in paths) {
-                          val r = get(pth, auth = false) ?: continue
-                          val tok = tokenOf(r)
-                          if (!tok.isNullOrEmpty()) { token = tok; break }
-                      }
-                      if (token.isEmpty()) continue
-                      val prof = get("type=stb&action=get_profile&mac=$mac")
-                      if (prof != null) {
-                          val st = statusOf(prof)
-                          accountStatus = st
-                          if (st.isNotEmpty() && st != "1" && !st.equals("ok", true) && !st.equals("active", true)) {
-                              lastError = "حالة الحساب في البوابة: $st"
-                              return false
-                          }
-                      }
-                      return true
+                  for (path in hs) {
+                      val r = get(path, auth = false) ?: continue
+                      val tok = tokenOf(r)
+                      if (!tok.isNullOrEmpty()) { token = tok; break }
                   }
-                  if (lastError.isEmpty()) lastError = "فشل المصافحة مع البوابة (handshake)"
-                  return false
+                  if (token.isEmpty()) {
+                      if (lastError.isBlank()) lastError = "فشلت المصافحة (handshake) — تحقق من MAC أو من https/http"
+                      return false
+                  }
+                  val prof = get("type=stb&action=get_profile&mac=$mac")
+                  if (prof != null) {
+                      val st = statusOf(prof)
+                      accountStatus = st
+                      if (st.isNotEmpty() && st != "1" && !st.equals("ok", true) && !st.equals("active", true)) {
+                          lastError = "حالة الحساب في البوابة: $st"
+                          return false
+                      }
+                  }
+                  return true
               }
 
               private fun tokenOf(json: String): String? {
                   return try {
-                      val o = JSONObject(json)
-                      val js = o.opt("js")
+                      val js = JSONObject(json).opt("js")
                       when (js) {
                           is String -> if (js.length > 8) js else null
                           is JSONObject -> js.optString("token").ifBlank { js.optJSONObject("auth")?.optString("token") ?: "" }.ifBlank { null }
-                          else -> o.optString("token").ifBlank { null }
+                          else -> JSONObject(json).optString("token").ifBlank { null }
                       }
                   } catch (t: Throwable) { null }
               }
@@ -4794,63 +4975,27 @@ jobs:
               private fun statusOf(json: String): String {
                   return try {
                       val o = JSONObject(json)
-                      listOf(
-                          o.optJSONObject("result")?.optString("status"),
-                          (o.optJSONObject("js") as? JSONObject)?.optString("status"),
-                          o.optString("status")
-                      ).firstOrNull { !it.isNullOrBlank() } ?: ""
+                      o.optJSONObject("result")?.optString("status")?.ifBlank { null }
+                          ?: (o.opt("js") as? JSONObject)?.optString("status")?.ifBlank { null }
+                          ?: o.optString("status")
                   } catch (t: Throwable) { "" }
               }
 
               // ----------------------------- البيانات -----------------------------
 
-              /** القنوات المباشرة مع خريطة التصنيفات. */
-              fun channels(live: MutableList<Channel>): Int {
-                  live.clear()
-                  val genres = HashMap<String, String>()
-                  try {
-                      for (o in items(get("type=itv&action=get_genres"))) {
-                          val id = o.optString("id")
-                          val title = o.optString("title", o.optString("name"))
-                          if (id.isNotEmpty() && title.isNotEmpty()) genres[id] = title
-                      }
-                  } catch (t: Throwable) { Crash.log(t) }
-                  var n = 0
-                  for (page in 0..1) {
-                      val r = try { get("type=itv&action=get_all_channels&number=$page") } catch (t: Throwable) { Crash.log(t); null }
-                      if (r == null) break
-                      val list = items(r)
-                      if (list.isEmpty()) break
-                      for (o in list) {
-                          val c = Channel()
-                          c.kind = "live"
-                          c.num = ++n
-                          c.name = o.optString("name").ifBlank { o.optString("num") }
-                          c.id = o.optString("id")
-                          c.url = o.optString("cmd").ifBlank { o.optString("media_url") }
-                          val gid = o.optString("tv_genre_id")
-                          c.group = genres[gid] ?: o.optString("tv_genre", "عام").ifBlank { "عام" }
-                          c.logo = o.optString("logo")
-                          c.extra = o.optString("num")
-                          if (c.url.isBlank()) continue
-                          live.add(c)
-                      }
-                  }
-                  return n
-              }
-
-              /** تصنيفات (أقسام) الأفلام أو المسلسلات — مع سلاسل احتياطية لأن البوابات تختلف. */
-              fun categories(kind: String): List<Group> {
-                  val cands = if (kind == "movie")
-                      listOf("type=vod&action=get_categories", "type=vod&action=get_filter", "type=itv&action=get_filter")
-                  else
-                      listOf("type=series&action=get_categories", "type=series&action=get_filter", "type=vod&action=get_categories", "type=vod&action=get_filter")
+              /** تصنيفات البوابة لنوع (itv / vod / series). */
+              private fun catsOf(type: String): List<Group> {
+                  val cands = listOf(
+                      "type=$type&action=get_categories",
+                      "type=$type&action=get_filter",
+                      "type=itv&action=get_filter"
+                  )
                   for (path in cands) {
-                      val r = try { get(path) } catch (t2: Throwable) { Crash.log(t2); null } ?: continue
+                      val r = get(path) ?: continue
                       val out = ArrayList<Group>()
                       for (o in items(r)) {
-                          val id = o.optString("id")
-                          val title = o.optString("title").ifBlank { o.optString("name") }
+                          val id = str(o, "id", "category_id", "value_id")
+                          val title = str(o, "title", "name", "alias")
                           if (id.isBlank() || title.isBlank()) continue
                           out.add(Group().apply { name = title; catId = id; count = o.optInt("total") })
                       }
@@ -4859,117 +5004,197 @@ jobs:
                           return out
                       }
                   }
-                  // البوابة لا تكشف التصنيفات: نترك «الكل» لتصفّح كل المحتوى
                   return listOf(Group().apply { name = "ALL"; catId = "0"; special = "all"; count = 0 })
               }
 
-              /** تُستدعى مرة واحدة لكل نوع: بعض البوابات تشترط ضبط الفلاتر قبل get_ordered_list. */
-              private val filterDone = HashSet<String>()
+              fun liveCategories(): List<Group> = catsOf("itv")
+              fun categories(kind: String): List<Group> = catsOf(if (kind == "movie") "vod" else "series")
 
-              /** قائمة مرتّبة (صفحة واحدة) لعنصر/فيلم/مسلسل داخل تصنيف، مع صيغ استعلام بديلة. */
+              /** القنوات المباشرة: get_all_channels، وعند الفشل get_ordered_list لكل تصنيف. */
+              fun channels(live: MutableList<Channel>): Int {
+                  live.clear(); n0 = 0
+                  val genres = HashMap<String, String>()
+                  get("type=itv&action=get_genres")?.let { r ->
+                      for (o in items(r)) {
+                          val id = str(o, "id"); val title = str(o, "title", "name")
+                          if (id.isNotBlank() && title.isNotBlank()) genres[id] = title
+                      }
+                  }
+                  for (page in 0..1) {
+                      val r = get("type=itv&action=get_all_channels&number=$page") ?: break
+                      val list = items(r)
+                      if (list.isEmpty()) break
+                      addChannels(list, live, genres, "")
+                      if (list.size < 1200) break
+                  }
+                  if (live.isEmpty()) {
+                      // بوابات لا تكشف get_all_channels: نجمع القنوات من كل تصنيف
+                      for (g in liveCategories()) {
+                          if (g.special == "all") continue
+                          val r = get("type=itv&action=get_ordered_list&category=" + g.catId) ?: continue
+                          addChannels(items(r), live, genres, g.name)
+                          if (live.size > 12000) break
+                      }
+                  }
+                  return live.size
+              }
+
+              private var n0 = 0
+
+              private fun addChannels(list: List<JSONObject>, live: MutableList<Channel>, genres: Map<String, String>, groupName: String) {
+                  for (o in list) {
+                      val c = Channel()
+                      c.kind = "live"
+                      c.num = ++n0
+                      c.name = str(o, "name", "title")
+                      c.id = str(o, "id", "picon_id")
+                      c.url = str(o, "cmd", "media_url", "url")
+                      val gid = str(o, "tv_genre_id")
+                      c.group = groupName.ifBlank { (genres[gid] ?: str(o, "tv_genre")).ifBlank { "عام" } }
+                      c.logo = str(o, "logo", "picon")
+                      c.alt = c.logo
+                      c.extra = str(o, "num")
+                      if (c.name.isNotBlank() && c.url.isNotBlank()) live.add(c)
+                  }
+              }
+
+              /** قائمة مرتّبة: category= (كما في دوال البوابة) مع genre= احتياطًا، وصفحة p= والبحث على الخادم. */
               fun ordered(kind: String, catId: String, page: Int, search: String, extra: String, out: MutableList<Channel>): Int {
                   val t = if (kind == "movie") "vod" else "series"
-                  if (filterDone.add(t)) {
-                      try { get("type=$t&action=get_filter&number=0") } catch (t2: Throwable) { Crash.log(t2) }
-                  }
+                  if (filterDone.add(t)) get("type=$t&action=get_filter&number=0")
                   val pg = Math.max(1, page)
                   val q = if (search.isNotBlank()) "&search=" + Uri.encode(search) else ""
-                  val g = if (catId.isNotBlank() && catId != "0") "&genre=$catId" else ""
-                  // صيغ الاستعلام تختلف بين البوابات: p + sortby + detailed / بدونها / number بدل p
+                  val c = if (catId.isNotBlank() && catId != "0") catId else ""
                   val cands = ArrayList<String>()
-                  cands.add("type=$t&action=get_ordered_list$g&p=$pg&sortby=posted&detailed=1$q")
-                  cands.add("type=$t&action=get_ordered_list$g&p=$pg&q=$pg$q&sortby=added&detailed=1")
-                  cands.add("type=$t&action=get_ordered_list$g&p=$pg$q")
-                  cands.add("type=$t&action=get_ordered_list$g&number=$pg$q&fltt=2")
-                  if (extra.isNotBlank()) {
-                      val base = "type=$t&action=get_ordered_list$g&p=$pg&sortby=posted&detailed=1&$extra"
-                      cands.add(0, base)
+                  fun add(gp: String) {
+                      cands.add("type=$t&action=get_ordered_list$gp&p=$pg$q&sortby=posted&detailed=1")
+                      cands.add("type=$t&action=get_ordered_list$gp&p=$pg$q")
+                      cands.add("type=$t&action=get_ordered_list$gp$extra&p=$pg&q=$pg$q&sortby=added&detailed=1")
+                      cands.add("type=$t&action=get_ordered_list$gp&number=${pg - 1}$q")
                   }
-                  var last: String? = null
+                  if (c.isNotEmpty()) {
+                      add("&category=$c")
+                      add("&genre=$c")
+                  } else {
+                      add("")
+                  }
                   var r: String? = null
-                  for (cand in cands) {
-                      val resp = try { get(cand) } catch (t2: Throwable) { Crash.log(t2); null } ?: continue
-                      last = resp
+                  for (path in cands) {
+                      val resp = get(path) ?: continue
                       if (items(resp).isNotEmpty()) { r = resp; break }
+                      totalOf(resp)
                   }
-                  if (r == null) {
-                      if (last == null && lastError.isEmpty()) lastError = "البوابة لم ترجع قائمة ($t)"
-                      return 0
-                  }
-                  totalOf(r)
+                  val src = r ?: return 0
+                  totalOf(src)
                   var n = 0
-                  for (o in items(r)) {
-                      val c = Channel()
-                      c.kind = kind
-                      c.num = ++n
-                      c.name = o.optString("name").ifBlank { o.optString("title") }
-                      c.id = o.optString("id")
-                      c.url = o.optString("cmd").ifBlank { o.optString("media_url").ifBlank { o.optString("url") } }
-                      c.alt = o.optString("screenshot").ifBlank { o.optString("cover") }
-                      c.logo = c.alt
-                      c.catId = catId
-                      c.group = o.optString("category_name").ifBlank { o.optString("genres") }
-                      c.extra = listOf(
-                          o.optString("year"), o.optString("rating"),
-                          o.optString("description").take(140)
-                      ).filter { it.isNotBlank() }.joinToString(" • ")
-                      if (c.name.isBlank()) continue
-                      out.add(c)
+                  for (o in items(src)) {
+                      val ch = Channel()
+                      ch.kind = kind
+                      ch.num = ++n
+                      ch.name = str(o, "name", "title")
+                      ch.id = str(o, "id", "movie_id", "series_id", "value_id")
+                      ch.url = str(o, "cmd", "media_url", "url")
+                      ch.alt = str(o, "screenshot_uri", "screenshot", "cover", "backdrop_path")
+                      ch.logo = ch.alt
+                      ch.catId = c
+                      ch.group = str(o, "category_name", "genres", "category_id")
+                      val desc = str(o, "description", "overview").take(150)
+                      ch.extra = listOf(str(o, "year"), str(o, "rating"), str(o, "name_orig"), desc).filter { it.isNotBlank() }.joinToString(" • ")
+                      if (ch.name.isBlank()) continue
+                      out.add(ch)
                   }
                   return out.size
               }
 
-              /** حلقات مسلسل (بوابات Stalker تخزّن الحلقات تحت vod مع series_id). */
-              fun episodes(seriesId: String, out: MutableList<Channel>): Int {
-                  var n = ordered("movie", "0", 1, "", "series_id=$seriesId", out)
-                  if (n == 0) n = ordered("series", "0", 1, "", "series_id=$seriesId", out)
-                  return n
-              }
-
-              /** يستخرج رابط التشغيل الحقيقي لعنصر بلا cmd. */
-              fun resolve(kind: String, id: String): String {
-                  val t = if (kind == "movie") "vod" else "series"
-                  for (a in listOf("get_info_from_list", "get_info", "get_play_list")) {
-                      val r = try { get("type=$t&action=$a&id=$id") } catch (t2: Throwable) { null } ?: continue
-                      val n = node(r)
-                      val src = if (n is JSONArray && n.length() > 0) n.optJSONObject(0) else n as? JSONObject
-                      if (src != null) {
-                          for (k in listOf("media_url", "cmd", "url", "download_url")) {
-                              val v = src.optString(k)
-                              if (v.startsWith("http")) return v
-                          }
-                          val inner = src.optJSONObject("js")
-                          if (inner != null) {
-                              val v = inner.optString("cmd")
-                              if (v.startsWith("http")) return v
+              /**
+               * معلومات مسلسل: js.series{موسم}.series[] (id, name, cmd) — كما في دالة loadStalkerSeriesInfo.
+               * يعيد الحلقات لكل المواسم مع اسم الموسم في group.
+               */
+              fun seriesInfo(seriesId: String, out: MutableList<Channel>): Int {
+                  val r = get("type=series&action=get_series_info&movie_id=$seriesId") ?: return 0
+                  val js = try { JSONObject(r).optJSONObject("js") } catch (t: Throwable) { null }
+                      ?: node(r) as? JSONObject
+                  val seasons = js?.optJSONObject("series")
+                  var n = 0
+                  if (seasons != null) {
+                      val keys = seasons.keys()
+                      while (keys.hasNext()) {
+                          val sk = keys.next()
+                          val sd = seasons.optJSONObject(sk) ?: continue
+                          val seasonTitle = sd.optString("name").ifBlank { "Season $sk" }
+                          val eps = sd.optJSONArray("series") ?: continue
+                          for (i in 0 until eps.length()) {
+                              val e = eps.optJSONObject(i) ?: continue
+                              val c = Channel()
+                              c.kind = "episode"
+                              c.num = ++n
+                              c.name = seasonTitle + " • " + e.optString("name").ifBlank { "Episode ${i + 1}" }
+                              c.group = seasonTitle
+                              c.id = e.optString("id").ifBlank { e.optString("movie_id") }
+                              c.url = str(e, "cmd", "media_url", "url")
+                              c.alt = str(e, "screenshot_uri", "screenshot")
+                              c.logo = c.alt
+                              c.catId = seriesId
+                              c.extra = e.optString("rating")
+                              out.add(c)
                           }
                       }
                   }
-                  return ""
+                  if (n == 0) {
+                      // بوابات تعرض الحلقات في قائمة vod بنفس المعرّف
+                      n = ordered("movie", "0", 1, "", "series_id=$seriesId", out)
+                  }
+                  return n
               }
 
-              /** يحوّل cmd الداخلي (rtmp/udp/ffmpeg) إلى رابط HTTP قابل للتشغيل. */
-              fun playable(cmd: String): String {
+              /** create_link حسب نوع العنصر: يحوّل cmd الداخلي إلى رابط HTTP. */
+              fun playable(kind: String, cmd: String): String {
                   val c = cmd.trim()
                   if (c.startsWith("http")) return c
-                  val r = try { get("type=itv&action=create_link&cmd=" + Uri.encode(c) + "&forced_country=") } catch (t: Throwable) { null }
-                      ?: return c
-                  val n = node(r)
-                  val field = when (n) {
-                      is JSONObject -> n.optString("cmd").ifBlank { n.optJSONObject("data")?.optString("cmd") ?: "" }
-                      else -> r
+                  val types = when (kind) {
+                      "live" -> arrayOf("itv", "vod", "series")
+                      "series", "episode" -> arrayOf("vod", "series", "itv")
+                      else -> arrayOf("vod", "itv", "series")
                   }
-                  val m = Regex("https?://[^\\s\"']+").find(field)
-                  return m?.value ?: c
+                  for (t in types) {
+                      val r = get("type=$t&action=create_link&cmd=" + Uri.encode(c) + "&js_price=0&forced_country=") ?: continue
+                      val field = when (val n = node(r)) {
+                          is JSONObject -> n.optString("cmd").ifBlank { n.optJSONObject("data")?.optString("cmd") ?: "" }
+                          else -> r
+                      }
+                      val m = Regex("https?://[^\\s\"']+").find(field)
+                      if (m != null) return m.value
+                  }
+                  lastError = "البوابة لم ترجع رابط create_link صالح"
+                  return c
               }
 
-              /** رابط القبض (timeshift) للبوابات التي تدعمه. */
+              /** رابط القبض (timeshift) للقنوات المباشرة. */
               fun timeshift(cmd: String, hours: Int): String {
-                  val c = cmd.trim()
-                  val r = try { get("type=itv&action=create_link&cmd=" + Uri.encode(c) + "&js_price=0&forced_country=&timeshift=" + (hours * 3600)) } catch (t: Throwable) { null }
-                  val n = node(r) as? JSONObject
-                  val field = n?.optString("cmd") ?: ""
-                  return (Regex("https?://[^\\s\"']+").find(field)?.value) ?: ""
+                  val r = get("type=itv&action=create_link&cmd=" + Uri.encode(cmd.trim()) +
+                      "&js_price=0&forced_country=&timeshift=" + (hours * 3600)) ?: return ""
+                  val field = (node(r) as? JSONObject)?.optString("cmd") ?: r
+                  return Regex("https?://[^\\s\"']+").find(field)?.value ?: ""
+              }
+
+              /** رابط بديل لعنصر بلا cmd: من get_ordered_list للبحث بالمعرّف. */
+              fun resolve(kind: String, id: String): String {
+                  val t = if (kind == "movie") "vod" else "series"
+                  for (path in listOf(
+                      "type=$t&action=get_info_from_list&id=$id",
+                      "type=$t&action=get_info&id=$id",
+                      "type=$t&action=get_ordered_list&search=" + Uri.encode(id)
+                  )) {
+                      val r = get(path) ?: continue
+                      for (o in items(r)) {
+                          val u = str(o, "media_url", "cmd", "url", "download_url")
+                          if (u.startsWith("http")) return u
+                      }
+                      val n = node(r) as? JSONObject
+                      val direct = n?.let { str(it, "media_url", "cmd", "url") } ?: ""
+                      if (direct.startsWith("http")) return direct
+                  }
+                  return ""
               }
           }
 
@@ -5124,16 +5349,16 @@ jobs:
               }
 
               private fun loadMac(p: Profile, progress: (String) -> Unit) {
-                  val s = Stalker(p.url, p.mac)
+                  val st = Stalker(p.url, p.mac)
                   progress("مصافحة البوابة…")
-                  if (!s.connect()) throw java.io.IOException(s.lastError.ifBlank { "تعذّر الاتصال بالبوّابة" })
+                  if (!st.connect()) throw java.io.IOException(st.lastError.ifBlank { "تعذّر الاتصال بالبواب" })
                   progress("قائمة القنوات…")
-                  s.channels(Catalog.live)
+                  st.channels(Catalog.live)
                   progress("أقسام الأفلام…")
-                  Catalog.movieCats.clear(); Catalog.movieCats.addAll(s.categories("movie"))
+                  Catalog.movieCats.clear(); Catalog.movieCats.addAll(st.categories("movie"))
                   progress("أقسام المسلسلات…")
-                  Catalog.seriesCats.clear(); Catalog.seriesCats.addAll(s.categories("series"))
-                  Catalog.status = if (s.accountStatus.isEmpty()) "متصل" else "حالة الحساب: " + s.accountStatus
+                  Catalog.seriesCats.clear(); Catalog.seriesCats.addAll(st.categories("series"))
+                  Catalog.status = if (st.accountStatus.isEmpty()) "متصل" else "حالة الحساب: " + st.accountStatus
               }
 
               fun macOrdered(p: Profile, kind: String, catId: String, page: Int, search: String, out: MutableList<Channel>, cb: (Int, Int) -> Unit) {
@@ -5142,32 +5367,25 @@ jobs:
                       var pages = 1
                       var err = ""
                       try {
-                          val s = Stalker(p.url, p.mac)
-                          if (!s.connect()) throw java.io.IOException(s.lastError.ifBlank { "فشل المصافحة" })
-                          if (catId == "all") {
-                              val cats = s.categories(kind)
-                              if (cats.size > 1) {
-                                  Catalog.movieCats.clear(); Catalog.seriesCats.clear()
-                                  if (kind == "movie") Catalog.movieCats.addAll(cats) else Catalog.seriesCats.addAll(cats)
-                              }
-                          }
-                          n = s.ordered(kind, catId, page, search, "", out)
-                          pages = s.totalPages
-                          if (n == 0) err = s.lastError
+                          val st = Stalker(p.url, p.mac)
+                          if (!st.connect()) throw java.io.IOException(st.lastError.ifBlank { "فشل المصافحة" })
+                          n = st.ordered(kind, catId, page, search, "", out)
+                          pages = st.totalPages
+                          if (n == 0) err = st.lastError
                       } catch (t: Throwable) { Crash.log(t); err = t.message ?: t.javaClass.simpleName }
-                      val fcount = n; val fpages = pages
-                      val ferr = err
+                      val fcount = n; val fpages = pages; val ferr = err
                       Bg.ui { cb(fcount, fpages) }
                       if (ferr.isNotEmpty()) android.util.Log.w("NovaPlay", "mac ordered: $ferr")
                   }
               }
 
+              /** حلقات مسلسل من البوابة (get_series_info مع مواسم). */
               fun macEpisodes(p: Profile, seriesId: String, out: MutableList<Channel>, cb: (Int) -> Unit) {
                   Bg.pool.execute {
                       var n = 0
                       try {
-                          val s = Stalker(p.url, p.mac)
-                          if (s.connect()) n = s.episodes(seriesId, out)
+                          val st = Stalker(p.url, p.mac)
+                          if (st.connect()) n = st.seriesInfo(seriesId, out)
                       } catch (t: Throwable) { Crash.log(t) }
                       Bg.ui { cb(n) }
                   }
@@ -5177,8 +5395,21 @@ jobs:
                   Bg.pool.execute {
                       var u = ""
                       try {
-                          val s = Stalker(p.url, p.mac)
-                          if (s.connect()) u = s.resolve(kind, id)
+                          val st = Stalker(p.url, p.mac)
+                          if (st.connect()) u = st.resolve(kind, id)
+                      } catch (t: Throwable) { Crash.log(t) }
+                      Bg.ui { cb(u) }
+                  }
+              }
+
+              /** يحوّل cmd البوابة الداخلي (ffmpeg/rtmp/udp) إلى رابط HTTP وقت التشغيل. */
+              fun macPlayable(p: Profile, kind: String, cmd: String, cb: (String) -> Unit) {
+                  if (cmd.startsWith("http")) { Bg.ui { cb(cmd) }; return }
+                  Bg.pool.execute {
+                      var u = cmd
+                      try {
+                          val st = Stalker(p.url, p.mac)
+                          if (st.connect()) u = st.playable(kind, cmd)
                       } catch (t: Throwable) { Crash.log(t) }
                       Bg.ui { cb(u) }
                   }
@@ -5189,25 +5420,14 @@ jobs:
                   Bg.pool.execute {
                       var u = ""
                       try {
-                          val st = Stalker(p.url, p.mac)
+                          val st = Stalker(p.url, st_mac(p))
                           if (st.connect()) u = st.timeshift(cmd, hours)
                       } catch (t: Throwable) { Crash.log(t) }
                       Bg.ui { cb(u) }
                   }
               }
 
-              /** يحوّل cmd البوابة الداخلي إلى رابط HTTP وقت التشغيل. */
-              fun macPlayable(p: Profile, cmd: String, cb: (String) -> Unit) {
-                  if (cmd.startsWith("http")) { Bg.ui { cb(cmd) }; return }
-                  Bg.pool.execute {
-                      var u = cmd
-                      try {
-                          val s = Stalker(p.url, p.mac)
-                          if (s.connect()) u = s.playable(cmd)
-                      } catch (t: Throwable) { Crash.log(t) }
-                      Bg.ui { cb(u) }
-                  }
-              }
+              private fun st_mac(p: Profile): String = p.mac
 
               fun xtreamEpisodes(p: Profile, seriesId: String, out: MutableList<Channel>, cb: (Int) -> Unit) {
                   Bg.pool.execute {
@@ -5316,7 +5536,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.3 (code 83)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.4 (code 84)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
