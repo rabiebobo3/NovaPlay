@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.5"
-      VERSION_CODE: "85"
+      VERSION_NAME: "8.6"
+      VERSION_CODE: "86"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 85)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.5")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 86)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.6")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -234,6 +234,16 @@ jobs:
 
           **ملاحظة مهمة**: في بوابات MAC الأمر المخزّن في القائمة ليس رابطًا؛ لذلك كل تشغيل يمرّ بـ `create_link`
           (وظيفة `Loader.macPlayable`) — وهذا هو سبب «الأقسام تظهر والتشغيل لا يعمل» قبل هذه النسخة.
+
+
+          ## 8.6 — تحكّم في عمق الجلب + جلب القسم عند الطلب
+
+          | العنصر | التفصيل |
+          |---|---|
+          | خيار «عمق الجلب» | في `الإعدادات السريعة` (زر MENU داخل المشغّل): صفحة 1 فقط / 6 صفحات / 20 صفحة / **كل الصفحات** (افتراضي). يُخزَّن في `mac_depth` ويُطبَّق عند «إعادة تحميل القائمة» |
+          | جلب قسم عند الضغط | `GridActivity.maybeFillCat`: لو القسم المحلي أقل من 14 عنصرًا يُجلب من السيرفر فورًا (`Stalker.fillCat`) ويُضاف للمحلي — فتح الأقسام الثقيلة ما بقاش يستنى التحميل الأول |
+          | ميزانية وقت مختلفة لكل نوع | الأفلام 150 ثانية، المسلسلات 210 ثانية (المواسم أثقل)، وسقف 45 ألف عنصر لكل نوع حتى لا يعلق الجهاز |
+          | إعادة ترقيم محلي | بعد أي إضافة تُعاد أرقام العناصر (`num = i+1`) حتى يبقى البحث والفرز صحيحين |
 
 
           ## التشغيل على GitHub
@@ -1676,6 +1686,34 @@ jobs:
                       " (${items.size})"
               }
 
+              /** لو القسم فاضي في الذاكرة (بوابة MAC): نجلبه من السيرفر فورًا ونضيفه محليًا. */
+              private fun maybeFillCat(g: Group) {
+                  val p = Catalog.profile
+                  if (!macLocal || inEpisodes || p?.type != "mac") return
+                  if (g.catId.isBlank() || g.special == "all" || g.special == "recent") return
+                  val cat = if (kind == "movie") Catalog.movie else Catalog.series
+                  var have = 0
+                  for (c in cat) if (c.catId == g.catId) have++
+                  if (have >= Stalker.PAGE_MIN) return
+                  showBusy(true, "جلب «" + g.name + "» من السيرفر…")
+                  val out = ArrayList<Channel>()
+                  Loader.macFillCat(this, p, kind, g.catId, g.name, out) { n ->
+                      showBusy(false, "")
+                      if (n == 0) { toast("لا عناصر في هذا القسم عند السيرفر"); return@macFillCat }
+                      val keep = ArrayList<Channel>()
+                      for (c in cat) if (c.catId != g.catId) keep.add(c)
+                      cat.clear(); cat.addAll(keep); cat.addAll(out)
+                      for (i in cat.indices) cat[i].num = i + 1
+                      g.count = n
+                      if (!inEpisodes) {
+                          all.clear(); all.addAll(cat)
+                          applyFilter()
+                          rvCats.adapter = CatAdapter()
+                      }
+                      toast("+ " + n + " عنصر في «" + g.name + "»")
+                  }
+              }
+
               private fun base0(): List<Channel> = all
 
               private fun showBusy(on: Boolean, t: String) {
@@ -1858,6 +1896,7 @@ jobs:
                           applyFilter()
                           notifyDataSetChanged()
                           rvGrid.scrollToPosition(0)
+                          maybeFillCat(g)
                       }
                   }
               }
@@ -2655,6 +2694,21 @@ jobs:
                   if (t.isNotEmpty()) tvLoadTxt.text = t
               }
 
+              private fun depthLabel(): String = when (sp.s("mac_depth", "3")) {
+                  "0" -> "صفحة 1 فقط"
+                  "1" -> "6 صفحات"
+                  "2" -> "20 صفحة"
+                  else -> "كل الصفحات"
+              }
+
+              /** يبدّل عمق الجلب ثم يطلب إعادة تحميل لتطبيقه. */
+              private fun cycleDepth() {
+                  val cur = sp.s("mac_depth", "3").toIntOrNull() ?: 3
+                  val nxt = if (cur >= 3) 0 else cur + 1
+                  sp.put("mac_depth", nxt.toString())
+                  toast("عمق الجلب: " + depthLabel() + " — اعمل «إعادة تحميل القائمة» لتطبيقه")
+              }
+
               private fun settingsDialog() {
                   val items = listOf(
                       if (autoNext) "☑ تشغيل التالي تلقائيًا" else "☐ تشغيل التالي تلقائيًا",
@@ -2662,7 +2716,8 @@ jobs:
                       "إعادة تحميل القائمة",
                       "معلومات الجلسة والحساب",
                       "تغيير رمز القفل",
-                      "مسح السجل"
+                      "مسح السجل",
+                      "عمق الجلب (أفلام/مسلسلات): " + depthLabel()
                   )
                   pickDialog("الإعدادات السريعة", items) { i ->
                       when (i) {
@@ -2681,6 +2736,7 @@ jobs:
                               if (code.length >= 3) { sp.put("lock_code", code); toast("تم تغيير الرمز") } else toast("قصير جدًا")
                           }
                           5 -> { recents.clear(); sp.put("recents", "[]"); buildGroups(); refresh(); toast("مُسح السجل") }
+                          6 -> cycleDepth()
                       }
                   }
               }
@@ -4128,7 +4184,7 @@ jobs:
                * جلب كل عناصر نوع كامل (كل الأقسام وكل الصفحات) بثمانية خيوط متوازية:
                * أسرع بكثير من التنقل قسمًا قسمًا، ويُظهر تقدّمًا أثناء العمل.
                */
-              fun fetchAll(kind: String, cats: List<Group>, out: MutableList<Channel>, budgetMs: Long, progress: (String) -> Unit): Int {
+              fun fetchAll(kind: String, cats: List<Group>, out: MutableList<Channel>, maxPages: Int, budgetMs: Long, progress: (String) -> Unit): Int {
                   val deadline = System.currentTimeMillis() + budgetMs
                   val type = if (kind == "movie") "vod" else "series"
                   if (type == "vod") req("type=vod&action=get_filter&number=0") else req("type=series&action=get_filter&number=0")
@@ -4150,7 +4206,7 @@ jobs:
                                   }
                                   val pages = pagesOf(first)
                                   var p = 2
-                                  while (arr.length() >= PAGE_MIN && p <= minOf(pages, MAX_PAGES_PER_CAT) &&
+                                  while (arr.length() >= PAGE_MIN && p <= minOf(pages, maxPages) &&
                                       totN.get() < MAX_ITEMS && System.currentTimeMillis() < deadline) {
                                       val r2 = page(type, g.catId, p, "") ?: break
                                       val a2 = itemsOf(r2)
@@ -4178,6 +4234,29 @@ jobs:
                   for (i in ordered.indices) ordered[i].num = i + 1
                   synchronized(out) { out.clear(); out.addAll(ordered) }
                   return out.size
+              }
+
+              /** يملأ قسمًا واحدًا بعدد محدد من الصفحات — يُستعمل عند الضغط على قسم فاضي محليًا. */
+              fun fillCat(kind: String, genreId: String, catName: String, maxPages: Int, out: MutableList<Channel>): Int {
+                  val type = if (kind == "movie") "vod" else "series"
+                  var p = 1
+                  var pages = 1
+                  var added = 0
+                  while (p <= pages && p <= maxPages) {
+                      val r = page(type, genreId, p, "") ?: break
+                      val arr = itemsOf(r)
+                      if (arr.length() == 0) break
+                      for (i in 0 until arr.length()) {
+                          val o = arr.optJSONObject(i) ?: continue
+                          val c = toChannel(o, kind, catName, genreId, out.size + 1)
+                          if (c.kind == "series") c.mid = c.id
+                          out.add(c); added++
+                      }
+                      if (p == 1) pages = pagesOf(r)
+                      if (arr.length() < PAGE_MIN) break
+                      p++
+                  }
+                  return added
               }
 
               /** بحث على الخادم داخل قسم (يُستعمل حين الكتابة في البحث). */
@@ -4449,7 +4528,7 @@ jobs:
                               progress("جاري الاتصال بالسيرفر…")
                               when (p.type) {
                                   "xtream" -> loadXtream(p, progress)
-                                  "mac" -> loadMac(p, progress)
+                                  "mac" -> loadMac(ctx, p, progress)
                                   else -> loadM3u(p, progress)
                               }
                               if (cancel) throw InterruptedException("ألغيت العملية")
@@ -4528,7 +4607,16 @@ jobs:
               }
 
               /** تحميل بوابة MAC: مصافحة ثم أقسام + كل القنوات والأفلام والمسلسلات (متوازي). */
-              private fun loadMac(p: Profile, progress: (String) -> Unit) {
+              /** عمق الجلب المحفوظ: 0 = صفحة 1 فقط، 1 = 6، 2 = 20، 3 = كل الصفحات (افتراضي). */
+              fun depth(ctx: Context): Int = when (ctx.sp.s("mac_depth", "3").toIntOrNull() ?: 3) {
+                  0 -> 1
+                  1 -> 6
+                  2 -> 20
+                  else -> 400
+              }
+
+              private fun loadMac(ctx: Context, p: Profile, progress: (String) -> Unit) {
+                  val deep = depth(ctx)
                   val st = Stalker(p.url, p.mac)
                   progress("مصافحة البوابة…")
                   if (!st.connect()) throw java.io.IOException(st.lastError.ifBlank { "تعذّر الاتصال بالبواب" })
@@ -4540,9 +4628,9 @@ jobs:
                   progress("قنوات البث المباشر…")
                   st.channels(Catalog.live)
                   progress("أفلام: جلب كل الأقسام…")
-                  val nm = st.fetchAll("movie", Catalog.movieCats, Catalog.movie, 150_000L) { t -> Bg.ui { progress("أفلام • $t") } }
+                  val nm = st.fetchAll("movie", Catalog.movieCats, Catalog.movie, deep, 150_000L) { t -> Bg.ui { progress("أفلام • $t") } }
                   progress("مسلسلات: جلب كل الأقسام…")
-                  val ns = st.fetchAll("series", Catalog.seriesCats, Catalog.series, 150_000L) { t -> Bg.ui { progress("مسلسلات • $t") } }
+                  val ns = st.fetchAll("series", Catalog.seriesCats, Catalog.series, deep, 210_000L) { t -> Bg.ui { progress("مسلسلات • $t") } }
                   Catalog.expiry = if (st.accountStatus.isBlank()) Catalog.expiry else ("حالة الحساب: " + st.accountStatus)
                   Catalog.status = "${Catalog.live.size} قناة • $nm فيلم • $ns مسلسل" +
                       (if (st.lastError.isNotBlank()) " • " + st.lastError else "")
@@ -4582,6 +4670,20 @@ jobs:
                       } catch (t: Throwable) { Crash.log(t) }
                       val fn = n; val fp = pages
                       Bg.ui { cb(fn, fp) }
+                  }
+              }
+
+              /** جلب قسم واحد من السيرفر (يُستعمل حين يكون القسم فاضيًا في الذاكرة). */
+              fun macFillCat(ctx: Context, p: Profile, kind: String, catId: String, catName: String, out: MutableList<Channel>, cb: (Int) -> Unit) {
+                  Bg.pool.execute {
+                      var n = 0
+                      try {
+                          val st = Stalker(p.url, p.mac)
+                          if (st.connect()) n = st.fillCat(kind, catId, catName, depth(ctx), out)
+                          else Catalog.status = st.lastError
+                      } catch (t: Throwable) { Crash.log(t) }
+                      val fn = n
+                      Bg.ui { cb(fn) }
                   }
               }
 
@@ -5824,7 +5926,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.5 (code 85)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.6 (code 86)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
