@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.2"
-      VERSION_CODE: "82"
+      VERSION_NAME: "8.3"
+      VERSION_CODE: "83"
     steps:
       - uses: actions/checkout@v4
 
@@ -126,8 +126,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 82)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.2")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 83)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.3")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -244,11 +244,6 @@ jobs:
                       android:exported="false"
                       android:screenOrientation="sensorLandscape" />
 
-                  <activity
-                      android:name=".AdminActivity"
-                      android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode"
-                      android:exported="false"
-                      android:screenOrientation="sensorLandscape" />
 
                   <provider
                       android:name="androidx.core.content.FileProvider"
@@ -912,28 +907,6 @@ jobs:
               </item>
           </selector>
           NP_EOF
-          cat <<'NP_EOF' > app/src/main/res/layout/activity_admin.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
-              android:layoutDirection="rtl" android:background="@drawable/bg_crystal">
-              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:padding="12dp">
-                  <Button android:id="@+id/btn_admin_back" android:layout_width="wrap_content" android:layout_height="38dp" android:text="رجوع" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:text="لوحة الأدمن" android:textColor="@color/np_gold" android:textSize="18sp" android:textStyle="bold"/>
-                  <Spinner android:id="@+id/sp_admin_tab" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:layout_marginStart="12dp" android:background="@drawable/input_gold" android:popupBackground="@color/np_surface"/>
-                  <TextView android:id="@+id/tv_admin_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="12dp" style="@style/NovaSmall"/>
-              </LinearLayout>
-              <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/np_stroke"/>
-              <androidx.recyclerview.widget.RecyclerView android:id="@+id/rv_admin" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:padding="10dp" android:clipToPadding="false"/>
-              <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:padding="10dp">
-                  <Button android:id="@+id/btn_admin_add" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:text="+ إضافة" android:background="@drawable/btn_gold" android:textColor="@color/np_bg"/>
-                  <Button android:id="@+id/btn_admin_refresh" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:layout_marginStart="6dp" android:text="تحديث" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
-                  <Button android:id="@+id/btn_admin_broadcast" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1.4" android:layout_marginStart="6dp" android:text="إرسال تنبيه" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
-                  <Button android:id="@+id/btn_admin_ota" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1.4" android:layout_marginStart="6dp" android:text="نشر التحديث" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
-                  <Button android:id="@+id/btn_admin_tools" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:layout_marginStart="6dp" android:text="أدوات" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
-              </LinearLayout>
-          </LinearLayout>
-          NP_EOF
           cat <<'NP_EOF' > app/src/main/res/layout/activity_grid.xml
           <?xml version="1.0" encoding="utf-8"?>
           <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -1032,12 +1005,18 @@ jobs:
                                       android:text="القبض" android:background="@drawable/btn_ghost" android:textColor="@color/np_text" android:textSize="12sp"/>
                               </LinearLayout>
                               <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="6dp">
-                                  <Button android:id="@+id/btn_prev" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:text="⏮ التالي؟ السابق"
+                                  <Button android:id="@+id/btn_speed" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="0.8" android:text="السرعة 1×"
+                                      android:background="@drawable/btn_ghost" android:textColor="@color/np_text" android:textSize="12sp"/>
+                                  <Button android:id="@+id/btn_tracks" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="0.8" android:layout_marginStart="6dp" android:text="الصوت/الترجمة"
+                                      android:background="@drawable/btn_ghost" android:textColor="@color/np_text" android:textSize="12sp"/>
+                                  <Button android:id="@+id/btn_quality" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="0.8" android:layout_marginStart="6dp" android:text="الجودة"
                                       android:background="@drawable/btn_ghost" android:textColor="@color/np_text" android:textSize="12sp"/>
                                   <Button android:id="@+id/btn_play" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="0.8" android:layout_marginStart="6dp"
                                       android:text="تشغيل/إيقاف" android:background="@drawable/btn_ghost" android:textColor="@color/np_text" android:textSize="12sp"/>
-                                  <Button android:id="@+id/btn_next" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:layout_marginStart="6dp"
-                                      android:text="القناة التالية ⏭" android:background="@drawable/btn_ghost" android:textColor="@color/np_text" android:textSize="12sp"/>
+                                  <Button android:id="@+id/btn_prev" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="0.7" android:layout_marginStart="6dp"
+                                      android:text="⏮" android:background="@drawable/btn_ghost" android:textColor="@color/np_text" android:textSize="12sp"/>
+                                  <Button android:id="@+id/btn_next" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="0.7" android:layout_marginStart="6dp"
+                                      android:text="⏭" android:background="@drawable/btn_ghost" android:textColor="@color/np_text" android:textSize="12sp"/>
                               </LinearLayout>
                           </LinearLayout>
                       </LinearLayout>
@@ -1110,6 +1089,12 @@ jobs:
                   </LinearLayout>
               </FrameLayout>
 
+              <!-- ======= طلب رقم القناة بالأرقام (ريموت) ======= -->
+              <TextView android:id="@+id/tvDial" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                  android:layout_gravity="top|end" android:layout_marginTop="60dp" android:layout_marginEnd="24dp"
+                  android:background="@drawable/chip_gold" android:paddingStart="16dp" android:paddingEnd="16dp" android:paddingTop="6dp" android:paddingBottom="6dp"
+                  android:textColor="@color/np_gold" android:textSize="24sp" android:textStyle="bold" android:visibility="gone"/>
+
               <!-- ======= شريط الحراسة (watchdog) ======= -->
               <LinearLayout android:id="@+id/wdBar" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom"
                   android:orientation="horizontal" android:gravity="center_vertical" android:background="@drawable/panel" android:padding="10dp"
@@ -1144,9 +1129,6 @@ jobs:
                       <Button android:id="@+id/btn_direct" android:layout_width="320dp" android:layout_height="46dp" android:layout_marginTop="10dp"
                           android:text="دخول مباشر (M3U / Xtream / MAC)" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
                       <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="12dp">
-                          <TextView android:id="@+id/btn_admin_open" android:layout_width="wrap_content" android:layout_height="40dp" android:gravity="center"
-                              android:text="لوحة الأدمن" style="@style/NovaSmall" android:paddingStart="12dp" android:paddingEnd="12dp"
-                              android:background="@drawable/btn_ghost" android:focusable="true" android:clickable="true"/>
                           <TextView android:id="@+id/btn_update_open" android:layout_width="wrap_content" android:layout_height="40dp" android:gravity="center"
                               android:text="تحديث التطبيق" style="@style/NovaSmall" android:paddingStart="12dp" android:paddingEnd="12dp"
                               android:background="@drawable/btn_ghost" android:focusable="true" android:clickable="true"/>
@@ -1240,10 +1222,6 @@ jobs:
                               <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_update"/>
                               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="التحقق من التحديث" style="@style/NovaLabel" android:layout_marginStart="10dp"/>
                           </LinearLayout>
-                          <LinearLayout android:id="@+id/tile_admin" style="@style/NovaTile" android:layout_marginTop="8dp">
-                              <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_shield"/>
-                              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="لوحة الأدمن" style="@style/NovaLabel" android:layout_marginStart="10dp"/>
-                          </LinearLayout>
                           <LinearLayout android:id="@+id/tile_reload" style="@style/NovaTile" android:layout_marginTop="8dp">
                               <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_reload"/>
                               <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="إعادة تحميل البوابة" style="@style/NovaLabel" android:layout_marginStart="10dp"/>
@@ -1326,21 +1304,6 @@ jobs:
               </LinearLayout>
           </LinearLayout>
           NP_EOF
-          cat <<'NP_EOF' > app/src/main/res/layout/item_admin.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content"
-              android:orientation="horizontal" android:background="@drawable/sel_row" android:padding="12dp" android:gravity="center_vertical"
-              android:focusable="true" android:clickable="true">
-              <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-                  <TextView android:id="@+id/a_title" android:layout_width="match_parent" android:layout_height="wrap_content"
-                      android:textColor="@color/np_text" android:textSize="14sp" android:textStyle="bold" android:singleLine="true"/>
-                  <TextView android:id="@+id/a_sub" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp"
-                      android:textColor="@color/np_text_dim" android:textSize="11sp" android:maxLines="3" android:ellipsize="end"/>
-              </LinearLayout>
-              <TextView android:id="@+id/a_tag" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp"
-                  android:textColor="@color/np_gold" android:textSize="11sp"/>
-          </LinearLayout>
-          NP_EOF
           cat <<'NP_EOF' > app/src/main/res/layout/item_card.xml
           <?xml version="1.0" encoding="utf-8"?>
           <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="138dp"
@@ -1383,404 +1346,6 @@ jobs:
               <TextView android:id="@+id/g_count" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp"
                   android:textColor="@color/np_gold" android:textSize="12sp" android:textStyle="bold"/>
           </LinearLayout>
-          NP_EOF
-          cat <<'NP_EOF' > app/src/main/java/com/nova/play/AdminActivity.kt
-          package com.nova.play
-
-          import android.content.Intent
-          import android.os.Bundle
-          import android.view.LayoutInflater
-          import android.view.View
-          import android.view.ViewGroup
-          import android.widget.ArrayAdapter
-          import android.widget.Button
-          import android.widget.Spinner
-          import android.widget.TextView
-          import androidx.appcompat.app.AppCompatActivity
-          import androidx.core.content.ContextCompat
-          import androidx.recyclerview.widget.LinearLayoutManager
-          import androidx.recyclerview.widget.RecyclerView
-          import org.json.JSONArray
-          import org.json.JSONObject
-
-          /**
-           * لوحة الأدمن: تُبنى برمجيًا فوق RecyclerView — إدارة المشتركين والسيرفرات،
-           * بثّ الإشعارات، نشر التحديث (OTA)، وأدوات الصيانة.
-           * مع Firebase تعمل على RTDB، وبدونه تعمل على تخزين محلي.
-           */
-          class AdminActivity : AppCompatActivity() {
-
-              private val tabs = listOf("المشتركون", "السيرفرات", "البث والإشعارات", "الصيانة", "الحالة")
-              private var tab = 0
-              private val rows = ArrayList<Row>()
-              private var remoteUsers = JSONObject()
-              private var broadcast = JSONObject()
-
-              private lateinit var rv: RecyclerView
-              private lateinit var status: TextView
-              private lateinit var spTab: Spinner
-              private lateinit var adapter: RowAdapter
-
-              class Row(var title: String, var sub: String, var key: String, var data: JSONObject? = null)
-
-              override fun onCreate(b: Bundle?) {
-                  super.onCreate(b)
-                  setContentView(R.layout.activity_admin)
-                  rv = findViewById(R.id.rv_admin)
-                  status = findViewById(R.id.tv_admin_status)
-                  spTab = findViewById(R.id.sp_admin_tab)
-                  rv.layoutManager = LinearLayoutManager(this)
-                  adapter = RowAdapter()
-                  rv.adapter = adapter
-                  spTab.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, tabs)
-                  spTab.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-                      override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                          tab = pos; reload()
-                      }
-
-                      override fun onNothingSelected(p: android.widget.AdapterView<*>?) {}
-                  }
-                  findViewById<Button>(R.id.btn_admin_back).setOnClickListener { finish() }
-                  findViewById<Button>(R.id.btn_admin_refresh).setOnClickListener { reload() }
-                  findViewById<Button>(R.id.btn_admin_add).setOnClickListener { add() }
-                  findViewById<Button>(R.id.btn_admin_broadcast).setOnClickListener { broadcastDialog() }
-                  findViewById<Button>(R.id.btn_admin_ota).setOnClickListener { publishOta() }
-                  findViewById<Button>(R.id.btn_admin_tools).setOnClickListener { toolsDialog() }
-                  status.text = (if (Remote.ready()) "سحابي (RTDB) • " else "محلي • ") + appVersion(this)
-              }
-
-              override fun onResume() {
-                  super.onResume()
-                  reload()
-              }
-
-              /* ------------------------------ التحميل ------------------------------ */
-
-              private fun reload() {
-                  rows.clear()
-                  when (tab) {
-                      0 -> loadUsers()
-                      1 -> loadServers()
-                      2 -> loadBroadcast()
-                      3 -> loadMaintenance()
-                      4 -> loadStatus()
-                  }
-                  adapter.notifyDataSetChanged()
-              }
-
-              private fun localUsers(): JSONObject = try { JSONObject(sp.s("users", "{}")) } catch (t: Throwable) { JSONObject() }
-
-              private fun saveLocalUsers(o: JSONObject) = sp.put("users", o.toString())
-
-              private fun loadUsers() {
-                  if (!Remote.ready()) {
-                      val o = localUsers()
-                      for (k in o.keys()) {
-                          val u = o.optJSONObject(k) ?: JSONObject()
-                          rows.add(Row(k, describe(u), k, u))
-                      }
-                      if (rows.isEmpty()) rows.add(Row("لا مشتركين", "أضف مشتركًا من زر «+ إضافة» — أو فعّل Firebase", "", null))
-                      return
-                  }
-                  Remote.get(this, "users") { o ->
-                      remoteUsers = o
-                      rows.clear()
-                      for (k in o.keys()) {
-                          val u = o.optJSONObject(k) ?: JSONObject()
-                          rows.add(Row(k, describe(u), k, u))
-                      }
-                      if (rows.isEmpty()) rows.add(Row("القائمة فارغة", "لا يوجد مشتركون في $ROOT/users", "", null))
-                      adapter.notifyDataSetChanged()
-                  }
-              }
-
-              private fun describe(u: JSONObject): String {
-                  val bits = ArrayList<String>()
-                  if (u.optBoolean("blocked", false)) bits.add("محظور")
-                  val exp = u.optString("expiry", u.optString("exp_date", ""))
-                  bits.add(if (exp.isEmpty()) "بلا انتهاء" else (if (Expiry.expired(exp)) "منتهي" else "ينتهي: $exp"))
-                  u.optString("devices").takeIf { it.isNotEmpty() }?.let { bits.add("أجهزة: $it") }
-                  u.optString("note").takeIf { it.isNotEmpty() }?.let { bits.add(it) }
-                  return bits.joinToString(" • ")
-              }
-
-              private fun loadServers() {
-                  val a = try { JSONArray(sp.s("servers", "[]")) } catch (t: Throwable) { JSONArray() }
-                  for (i in 0 until a.length()) {
-                      val o = a.getJSONObject(i)
-                      rows.add(Row(o.optString("name", "سيرفر $i"), o.optString("type") + " • " + o.optString("url"), i.toString(), o))
-                  }
-                  if (rows.isEmpty()) rows.add(Row("لا سيرفرات", "أضف سيرفرًا من زر «+ إضافة»", "", null))
-              }
-
-              private fun loadBroadcast() {
-                  if (Remote.ready()) {
-                      Remote.get(this, "broadcast") { o ->
-                          broadcast = o
-                          rows.clear()
-                          val tsTxt = if (o.optLong("ts") > 0) Expiry.human((o.optLong("ts") / 1000).toString()) else "بدون وقت"
-                          rows.add(Row(o.optString("title", "بث عام"), o.optString("text", "لا رسالة بعد") + " • " + tsTxt, "bc", o))
-                          rows.add(Row("آخر رسالة للعملاء", if (o.length() > 0) "تم الاستلام من القاعدة" else "—", "bc2", null))
-                          adapter.notifyDataSetChanged()
-                      }
-                  } else {
-                      broadcast = try { JSONObject(sp.s("broadcast", "{}")) } catch (t: Throwable) { JSONObject() }
-                      rows.add(Row(broadcast.optString("title", "بث محلي"), broadcast.optString("text", "لا رسالة بعد"), "bc", broadcast))
-                      rows.add(Row("الحالة", "وضع محلي: الإشعار يظهر على هذا الجهاز فقط", "bc2", null))
-                  }
-              }
-
-              private fun loadMaintenance() {
-                  val crash = Crash.read(this)
-                  rows.add(Row("سجل الأعطال", crash.lineSequence().take(4).joinToString(" ⏎ "), "crash", null))
-                  rows.add(Row("الذاكرة والكاش", sp.s("mem", "لم يُقاس بعد"), "mem", null))
-                  rows.add(Row("قوائم مخزّنة", "المفضلة " + countOf("favs") + " • السجل " + countOf("recents") + " • المجمعات " + countOf("mygroups"), "lists", null))
-                  rows.add(Row("الجلسة", "المستخدم: " + sp.s("auth_user", "—") + " • المعرّف: " + sp.s("auth_session", "—").take(8), "session", null))
-                  rows.add(Row("الحراسة (watchdog)", "25 ثانية • إعادة المحاولة 3 مرات • بديل تلقائي: " + if (sp.b("smart_alt", true)) "نعم" else "لا", "wd", null))
-              }
-
-              private fun countOf(key: String): Int = try { JSONArray(sp.s(key, "[]")).length() } catch (t: Throwable) {
-                  try { JSONObject(sp.s(key, "{}")).length() } catch (t2: Throwable) { 0 }
-              }
-
-              private fun loadStatus() {
-                  rows.add(Row("الإصدار", appVersion(this) + " • " + (if (Remote.ready()) "Firebase مفعّل" else "وضع محلي"), "ver", null))
-                  rows.add(Row("القائمة", "${Catalog.live.size} مباشر • ${Catalog.movie.size} أفلام • ${Catalog.series.size} مسلسلات • ${Catalog.source}", "cat", null))
-                  val o = JSONObject()
-                  Remote.get(this, "app") { a ->
-                      o.apply {
-                          put("code", a.optLong("code"))
-                          put("parts", a.optInt("parts"))
-                      }
-                      runOnUiThread {
-                          val otaTxt = if (o.optLong("code") > 0) "code " + o.optLong("code") + " • " + o.optInt("parts") + " جزء" else "لم يُنشر بعد"
-                          rows.add(Row("التحديث المنشور", otaTxt, "ota", o))
-                          rows.add(Row("رمز FCM", sp.s("fcm", "غير مسجّل").take(24), "fcm", null))
-                          rows.add(Row("آخر فحص تحديث", Expiry.human((sp.l("last_ota_check") / 1000).toString()), "chk", null))
-                          adapter.notifyDataSetChanged()
-                      }
-                  }
-              }
-
-              /* ------------------------------ الإجراءات ------------------------------ */
-
-              private fun add() {
-                  when (tab) {
-                      0 -> inputDialog("مشترك جديد", "اسم المستخدم", "كلمة المرور", msg = "اترك الانتهاء فارغًا = بلا انتهاء") { u, p ->
-                          if (u.isBlank() || p.isBlank()) { toast("أكمل الحقول"); return@inputDialog }
-                          inputDialog("تفاصيل", "الانتهاء yyyy-MM-dd", "عدد الأجهزة", v2 = "1") { exp, dev ->
-                              val rec = JSONObject()
-                              rec.put("pass", p)
-                              if (exp.isNotBlank()) rec.put("expiry", exp)
-                              rec.put("devices", dev.toIntOrNull() ?: 1)
-                              rec.put("created", System.currentTimeMillis())
-                              if (Remote.ready()) Remote.set(this, "users/$u", mapOf(
-                                  "pass" to p,
-                                  "expiry" to exp,
-                                  "devices" to (dev.toIntOrNull() ?: 1),
-                                  "created" to System.currentTimeMillis(),
-                                  "blocked" to false
-                              )) { ok -> toast(if (ok) "أُضيف $u" else "فشل الحفظ في السحابة"); reload() }
-                              else {
-                                  val o = localUsers(); o.put(u, rec); saveLocalUsers(o)
-                                  toast("أُضيف $u محليًا"); reload()
-                              }
-                          }
-                      }
-                      1 -> inputDialog("سيرفر جديد", "الاسم", "الرابط") { n, url ->
-                          if (url.isBlank()) { toast("أدخل الرابط"); return@inputDialog }
-                          inputDialog("النوع", "xtream / mac / m3u", "المستخدم:كلمة المرور أو MAC", v1 = "m3u") { t, c2 ->
-                              val p = Profile()
-                              p.name = n.ifBlank { url }
-                              p.url = url
-                              p.type = if (t == "xtream" || t == "mac") t else "m3u"
-                              if (p.type == "xtream") { p.user = c2.substringBefore(":"); p.pass = c2.substringAfter(":", "") }
-                              if (p.type == "mac") p.mac = c2
-                              p.added = System.currentTimeMillis()
-                              val a = try { JSONArray(sp.s("servers", "[]")) } catch (t2: Throwable) { JSONArray() }
-                              a.put(p.toJson())
-                              sp.put("servers", a.toString())
-                              toast("حُفظ السيرفر"); reload()
-                          }
-                      }
-                      2 -> broadcastDialog()
-                      else -> toast("لا شيء للإضافة هنا")
-                  }
-              }
-
-              private fun broadcastDialog() {
-                  inputDialog("بث إشعار", "العنوان", "النص", v1 = "تنبيه من الإدارة") { t, x ->
-                      if (x.isBlank()) { toast("اكتب نص الرسالة"); return@inputDialog }
-                      if (Remote.ready()) {
-                          Remote.set(this, "broadcast", mapOf("title" to t, "text" to x, "ts" to System.currentTimeMillis())) { ok ->
-                              toast(if (ok) "بُثّ الإعلان لكل الأجهزة" else "فشل النشر في RTDB")
-                              reload()
-                          }
-                      } else {
-                          val o = JSONObject(); o.put("title", t); o.put("text", x); o.put("ts", System.currentTimeMillis())
-                          sp.put("broadcast", o.toString())
-                          Notify.push(this, t, x)
-                          toast("ظهر محليًا فقط (لا Firebase)"); reload()
-                      }
-                  }
-              }
-
-              private fun publishOta() {
-                  confirmDialog("نشر التحديث", "سيقرأ التطبيق ملف APK المثبت ويقسمه إلى أجزاء base64 ويرفعها إلى $ROOT/app/p/* مع رقم الإصدار.\n" +
-                      "استعمله فقط من نسخة مبنية للإرسال. متابعة؟") {
-                      val d = ProgressDlg(this, "نشر التحديث")
-                      d.show()
-                      Ota.publish(this, "نشر من لوحة الأدمن", { pct, txt -> d.set(pct, txt) }) { ok, msg ->
-                          d.close()
-                          toast(msg)
-                          reload()
-                      }
-                  }
-              }
-
-              private fun toolsDialog() {
-                  val items = listOf(
-                      "مسح سجل الأعطال", "تنظيف الكاش الآن", "تصفير جلسة الدخول", "إعادة تشغيل التطبيق",
-                      "إعادة ضبط كامل للتطبيق", "تصدير الإعدادات (JSON)"
-                  )
-                  pickDialog("أدوات الصيانة", items) { i ->
-                      when (i) {
-                          0 -> { Crash.clear(this); toast("مُسح السجل"); reload() }
-                          1 -> { Memory.trim(this, true); toast("نُظّف الكاش"); reload() }
-                          2 -> { sp.rm("auth_user"); sp.rm("auth_session"); toast("صُفّرت الجلسة"); reload() }
-                          3 -> restart()
-                          4 -> confirmDialog("تأكيد", "سيُحذف كل شيء: السيرفرات، المفضلات، السجل، الحساب.", {
-                              try {
-                                  val prefs = applicationContext.sp.all
-                                  val e = applicationContext.sp.edit()
-                                  for (k in prefs.keys) e.remove(k)
-                                  e.apply()
-                                  Memory.trim(this, true)
-                              } catch (t: Throwable) { Crash.log(t) }
-                              restart()
-                          })
-                          5 -> infoDialog("الإعدادات", JSONObject(sp.all.mapValues { it.value.toString() }).toString(2))
-                      }
-                  }
-              }
-
-              private fun restart() {
-                  try {
-                      val i = packageManager.getLaunchIntentForPackage(packageName)
-                      i?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                      startActivity(i)
-                  } catch (t: Throwable) {}
-                  finishAffinity()
-              }
-
-              private fun rowMenu(r: Row) {
-                  when (tab) {
-                      0 -> usersMenu(r)
-                      1 -> serversMenu(r)
-                      else -> pickDialog(r.title, listOf("إغلاق")) { }
-                  }
-              }
-
-              private fun usersMenu(r: Row) {
-                  val d = r.data
-                  if (r.key.isEmpty() || d == null) return
-                  val u = r.key
-                  val items = listOf("كلمة المرور", "تاريخ الانتهاء", "عدد الأجهزة", if (d.optBoolean("blocked")) "رفع الحظر" else "حظر", "تمديد 30 يوم", "تسجيل خروج الأجهزة", "حذف الحساب")
-                  pickDialog(u, items) { i ->
-                      when (i) {
-                          0 -> inputDialog("كلمة المرور", "جديدة", null, v1 = d.optString("pass", "")) { p, _ -> patch(u, mapOf("pass" to p)) }
-                          1 -> inputDialog("الانتهاء", "yyyy-MM-dd أو timestamp", null, v1 = d.optString("expiry", "")) { e, _ -> patch(u, mapOf("expiry" to e)) }
-                          2 -> inputDialog("عدد الأجهزة", "رقم", null, v1 = d.optInt("devices", 1).toString()) { n, _ -> patch(u, mapOf("devices" to (n.toIntOrNull() ?: 1))) }
-                          3 -> patch(u, mapOf("blocked" to !d.optBoolean("blocked", false)))
-                          4 -> {
-                              val exp = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
-                                  .format(java.util.Date(System.currentTimeMillis() + 30L * 86_400_000L))
-                              patch(u, mapOf("expiry" to exp))
-                          }
-                          5 -> {
-                              Remote.remove(this, "devs/$u") { ok -> toast(if (ok) "فُصلت كل الأجهزة" else "غير متاح محليًا") }
-                              if (!Remote.ready()) toast("لا حاجة: وضع محلي")
-                          }
-                          6 -> confirmDialog("حذف", "حذف المستخدم $u نهائيًا؟") {
-                              if (Remote.ready()) Remote.remove(this, "users/$u") { reload() }
-                              else {
-                                  val o = localUsers(); o.remove(u); saveLocalUsers(o); reload()
-                              }
-                          }
-                      }
-                  }
-              }
-
-              private fun patch(u: String, values: Map<String, Any>) {
-                  if (Remote.ready()) {
-                      val v = HashMap<String, Any>(values)
-                      Remote.set(this, "users/$u", v) { ok -> toast(if (ok) "حُفظ" else "فشل"); reload() }
-                  } else {
-                      val o = localUsers()
-                      val rec = o.optJSONObject(u) ?: JSONObject()
-                      for ((k, x) in values) rec.put(k, x)
-                      o.put(u, rec); saveLocalUsers(o)
-                      toast("حُفظ محليًا"); reload()
-                  }
-              }
-
-              private fun serversMenu(r: Row) {
-                  val o = r.data
-                  if (o == null) return
-                  val idx = r.key.toIntOrNull() ?: return
-                  pickDialog(o.optString("name", "سيرفر"), listOf("اجعله الحالي", "اختبار التحميل", "حذف")) { i ->
-                      when (i) {
-                          0 -> { sp.put("last", o.toString()); toast("تم تعيين السيرفر الحالي") }
-                          1 -> {
-                              val p = Profile.fromJson(o)
-                              val d = ProgressDlg(this, "اختبار ${p.name}")
-                              d.show()
-                              Loader.load(this, p, true, { t -> d.set(20, t) }) { ok, msg ->
-                                  d.close()
-                                  infoDialog(if (ok) "نجح" else "فشل",
-                                      "قنوات: ${Catalog.live.size} • أفلام: ${Catalog.movie.size} • مسلسلات: ${Catalog.series.size}\n$msg")
-                                  reload()
-                              }
-                          }
-                          2 -> {
-                              val a = JSONArray(sp.s("servers", "[]"))
-                              val b = JSONArray()
-                              for (j in 0 until a.length()) if (j != idx) b.put(a.getJSONObject(j))
-                              sp.put("servers", b.toString())
-                              reload()
-                          }
-                      }
-                  }
-              }
-
-              /* ------------------------------ المحوّل ------------------------------ */
-
-              inner class RowAdapter : RecyclerView.Adapter<H>() {
-                  override fun onCreateViewHolder(parent: ViewGroup, t: Int): H =
-                      H(LayoutInflater.from(parent.context).inflate(R.layout.item_admin, parent, false))
-
-                  override fun getItemCount(): Int = rows.size
-
-                  override fun onBindViewHolder(h: H, i: Int) {
-                      val r = rows[i]
-                      h.title.text = r.title
-                      h.sub.text = r.sub
-                      h.tag.text = when {
-                          r.key.isEmpty() -> ""
-                          tab == 0 -> "مستخدم"
-                          tab == 1 -> "سيرفر"
-                          else -> "أداة"
-                      }
-                      h.itemView.setOnClickListener { rowMenu(r) }
-                  }
-              }
-
-              class H(v: View) : RecyclerView.ViewHolder(v) {
-                  val title: TextView = v.findViewById(R.id.a_title)
-                  val sub: TextView = v.findViewById(R.id.a_sub)
-                  val tag: TextView = v.findViewById(R.id.a_tag)
-              }
-          }
           NP_EOF
           cat <<'NP_EOF' > app/src/main/java/com/nova/play/Cloud.kt
           package com.nova.play
@@ -2311,56 +1876,6 @@ jobs:
                   }
               }
 
-              /* --------------------- النشر من لوحة الأدمن --------------------- */
-
-              /** يقرأ APK المثبت ويقسّمه أجزاء base64 في app/p/i ثم ينشر الرقم. */
-              fun publish(ctx: Context, note: String, progressRaw: (Int, String) -> Unit, doneRaw: (Boolean, String) -> Unit) {
-                  val progress = { a: Int, b: String -> Bg.ui { progressRaw(a, b) } }
-                  val done = { a: Boolean, b: String -> Bg.ui { doneRaw(a, b) } }
-                  if (!Remote.ready()) { done(false, "النشر يحتاج Firebase (google-services.json)"); return }
-                  Bg.pool.execute {
-                      try {
-                          val path = ctx.applicationInfo.sourceDir
-                          val f = File(path)
-                          if (!f.exists()) { Bg.ui { done(false, "ملف APK غير موجود") }; return@execute }
-                          val total = f.length()
-                          val size = 480 * 1024
-                          val n = Math.max(1, ((total + size - 1) / size).toInt())
-                          val code = try {
-                              val pi = ctx.packageManager.getPackageInfo(ctx.packageName, 0)
-                              if (Build.VERSION.SDK_INT >= 28) pi.longVersionCode else @Suppress("DEPRECATION") pi.versionCode.toLong()
-                          } catch (t: Throwable) { 0L }
-                          val ins = f.inputStream()
-                          val buf = ByteArray(size)
-                          for (i in 0 until n) {
-                              val read = readFull(ins, buf)
-                              val b64 = android.util.Base64.encodeToString(buf, 0, read, android.util.Base64.NO_WRAP)
-                              val ok = booleanArrayOf(false)
-                              val latch = java.util.concurrent.CountDownLatch(1)
-                              Remote.set(ctx, "app/p/$i", mapOf("v" to b64, "len" to read)) { r -> ok[0] = r; latch.countDown() }
-                              latch.await(90, java.util.concurrent.TimeUnit.SECONDS)
-                              progress(5 + (i + 1) * 92 / n, "رفع $i/$n (${fmtBytes(total * (i + 1) / n)})")
-                              if (!ok[0]) { ins.close(); Bg.ui { done(false, "فشل الرفع عند الجزء $i") }; return@execute }
-                          }
-                          ins.close()
-                          val head = mapOf<String, Any>("code" to code, "parts" to n, "name" to (ctx.sp.s("ota_name", appVersion(ctx))), "note" to note, "bytes" to total)
-                          Remote.set(ctx, "app", head) { ok -> Bg.ui { done(ok, if (ok) "نُشر v$code ($n جزء)" else "فشل نشر بيانات الإصدار") } }
-                      } catch (t: Throwable) {
-                          Crash.log(t)
-                          Bg.ui { done(false, "خطأ: " + (t.message ?: t.javaClass.simpleName)) }
-                      }
-                  }
-              }
-
-              private fun readFull(ins: java.io.InputStream, buf: ByteArray): Int {
-                  var n = 0
-                  while (n < buf.size) {
-                      val r = try { ins.read(buf, n, buf.size - n) } catch (t: Throwable) { -1 }
-                      if (r < 0) break
-                      n += r
-                  }
-                  return n
-              }
           }
 
           /** غطاء إيقاف تنزيل OTA (يُستعمل من واجهة التحديث). */
@@ -2899,6 +2414,10 @@ jobs:
               private val items = ArrayList<Channel>()
               private val cats = ArrayList<Group>()
               private var inEpisodes = false
+              private var macMode = false
+              private var totalPages = 1
+              private var loadingMore = false
+              private var searchTask: Runnable? = null
               private var seriesName = ""
               private val favs = ArrayList<Channel>()
 
@@ -2909,6 +2428,7 @@ jobs:
               private lateinit var busy: LinearLayout
               private lateinit var busyTxt: TextView
               private lateinit var adapter: CardAdapter
+              private val h = android.os.Handler(android.os.Looper.getMainLooper())
 
               override fun onCreate(b: Bundle?) {
                   super.onCreate(b)
@@ -2928,10 +2448,29 @@ jobs:
                   rvCats.layoutManager = LinearLayoutManager(this)
                   adapter = CardAdapter()
                   rvGrid.adapter = adapter
+                  rvGrid.setHasFixedSize(true)
+                  rvGrid.itemAnimator = null
+                  try { rvGrid.recycledViewPool.setMaxRecycledViews(0, 24) } catch (t: Throwable) {}
+                  // تحميل الصفحة التالية عند الاقتراب من آخر القائمة
+                  rvGrid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                      override fun onScrolled(r: RecyclerView, dx: Int, dy: Int) {
+                          if (!macMode || inEpisodes || loadingMore || page >= totalPages) return
+                          val lm = r.layoutManager as? GridLayoutManager ?: return
+                          val last = lm.findLastVisibleItemPosition()
+                          if (last >= items.size - 8) loadMac(page + 1, false)
+                      }
+                  })
 
                   title.text = if (kind == "movie") "أفلام" else "مسلسلات"
                   etSearch.addTextChangedListener(object : android.text.TextWatcher {
-                      override fun afterTextChanged(s: android.text.Editable?) { applyFilter() }
+                      override fun afterTextChanged(s: android.text.Editable?) {
+                          searchTask?.let { h.removeCallbacks(it) }
+                          val r = Runnable {
+                              if (macMode && !inEpisodes) loadMac(1, true) else applyFilter()
+                          }
+                          searchTask = r
+                          h.postDelayed(r, 300)
+                      }
                       override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                       override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                   })
@@ -2953,7 +2492,23 @@ jobs:
                   if (t.isEmpty()) null else Profile.fromJson(JSONObject(t))
               } catch (t: Throwable) { null }
 
+              private fun profile(): Profile? = Catalog.profile ?: lastProfile()
+
               private fun build() {
+                  macMode = profile()?.type == "mac"
+                  if (macMode) {
+                      cats.clear()
+                      val src = if (kind == "movie") Catalog.movieCats else Catalog.seriesCats
+                      if (src.isNotEmpty()) cats.addAll(src)
+                      else cats.add(Group().apply { name = "ALL"; catId = "0"; special = "all"; count = 0 })
+                      if (cats.none { it.special == "all" }) cats.add(0, Group().apply { name = "ALL"; catId = "0"; special = "all"; count = 0 })
+                      rvCats.adapter = CatAdapter()
+                      selCat = cats.firstOrNull { it.special == "all" } ?: cats.firstOrNull()
+                      page = 1; totalPages = 1
+                      all.clear(); items.clear(); adapter.notifyDataSetChanged()
+                      loadMac(1, true)
+                      return
+                  }
                   all.clear()
                   all.addAll(if (kind == "movie") Catalog.movie else Catalog.series)
                   cats.clear()
@@ -2964,6 +2519,32 @@ jobs:
                   rvCats.adapter = CatAdapter()
                   selCat = cats.firstOrNull { it.special == "all" }
                   applyFilter()
+              }
+
+              /** صفحة من قائمة البوابة (p + search) مع احترام عدد الصفحات. */
+              private fun loadMac(p: Int, replace: Boolean) {
+                  val pr = profile() ?: return
+                  if (p < 1) return
+                  loadingMore = true
+                  showBusy(true, "تحميل الصفحة $p…")
+                  val out = ArrayList<Channel>()
+                  val cat = selCat
+                  val catId = if (cat == null || cat.special == "all") "0" else cat.catId
+                  Loader.macOrdered(pr, kind, catId, p, etSearch.text.toString().trim(), out) { n, pages ->
+                      showBusy(false, "")
+                      loadingMore = false
+                      page = p
+                      totalPages = if (pages < 1) 1 else pages
+                      if (n == 0 && replace) {
+                          title.text = (if (kind == "movie") "أفلام" else "مسلسلات") + " — لا توجد عناصر في هذا القسم"
+                          toast("القسم فارغ من البوابة" + (if (totalPages > 1) " (صفحة $p/$totalPages)" else ""))
+                          return@macOrdered
+                      }
+                      if (replace) all.clear()
+                      all.addAll(out)
+                      applyFilter()
+                      if (n > 0) toast("$n عنصر • صفحة $p/$totalPages")
+                  }
               }
 
               private fun applyFilter() {
@@ -2980,7 +2561,7 @@ jobs:
                   adapter.notifyDataSetChanged()
                   title.text = (if (inEpisodes) seriesName else (if (kind == "movie") "أفلام" else "مسلسلات")) +
                       (if (selCat != null && selCat!!.special != "all") " • " + selCat!!.name else "") +
-                      " (${items.size})"
+                      " (${items.size}" + (if (macMode && !inEpisodes) "/$totalPages ص" else "") + ")"
               }
 
               private fun base0(): List<Channel> = all
@@ -3009,23 +2590,32 @@ jobs:
                       if (p?.type == "mac" && c.id.isNotBlank()) {
                           showBusy(true, "تحميل الحلقات…")
                           val out = ArrayList<Channel>()
-                          Loader.macOrdered(this, p, kind, c.id, out) { n ->
+                          Loader.macEpisodes(p, c.id, out) { n ->
                               showBusy(false, "")
-                              inEpisodes = n > 0
-                              if (n > 0) { all.clear(); all.addAll(out); applyFilter() } else playNow(c)
+                              if (n == 0) { toast("لا حلقات — تشغيل مباشر"); playNow(c); return@macEpisodes }
+                              all.clear(); all.addAll(out)
+                              inEpisodes = true; seriesName = c.name
+                              applyFilter()
+                              rvGrid.scrollToPosition(0)
                           }
                           return
                       }
                   }
-                  if (kind == "movie" && p?.type == "mac" && c.url.isBlank() && c.id.isNotBlank()) {
+                  if (p?.type == "mac" && !c.url.startsWith("http") && c.id.isNotBlank()) {
                       showBusy(true, "تجهيز الرابط…")
-                      val out = ArrayList<Channel>()
-                      Loader.macOrdered(this, p, kind, c.catId, out) { n ->
-                          showBusy(false, "")
-                          val real = out.firstOrNull { it.id == c.id }
-                          if (real != null && real.url.isNotBlank()) playNow(real) else toast("لا يوجد رابط صالح ($n)")
+                      val u0 = c.url.ifBlank { c.alt }
+                      if (!u0.startsWith("http")) {
+                          val out = ArrayList<Channel>()
+                          Loader.macResolve(p, kind, c.id) { u ->
+                              val found = if (u.startsWith("http")) u else u0
+                              if (found.isBlank()) { showBusy(false, ""); toast("البوابة لم ترجع رابطاً لهذا العنصر"); return@macResolve }
+                              // الحلقة نفسها قد تحمل cmd داخلي → LiveActivity يحوّله عبر create_link
+                              c.url = found
+                              showBusy(false, "")
+                              playNow(c)
+                          }
+                          return
                       }
-                      return
                   }
                   playNow(c)
               }
@@ -3119,9 +2709,11 @@ jobs:
                       h.itemView.setOnClickListener {
                           selCat = g
                           etSearch.setText("")
-                          applyFilter()
+                          page = 1; totalPages = 1
                           notifyDataSetChanged()
                           rvGrid.scrollToPosition(0)
+                          if (macMode && !inEpisodes) { all.clear(); items.clear(); adapter.notifyDataSetChanged(); loadMac(1, true) }
+                          else applyFilter()
                       }
                   }
               }
@@ -3159,16 +2751,21 @@ jobs:
           import androidx.appcompat.app.AlertDialog
           import androidx.appcompat.app.AppCompatActivity
           import androidx.core.content.ContextCompat
+          import androidx.media3.common.AudioAttributes
           import androidx.media3.common.C
+          import androidx.media3.common.Format
           import androidx.media3.common.MediaItem
           import androidx.media3.common.MediaMetadata
           import androidx.media3.common.PlaybackException
           import androidx.media3.common.Player
+          import androidx.media3.common.TrackSelectionOverride
+          import androidx.media3.common.Tracks
           import androidx.media3.common.VideoSize
           import androidx.media3.datasource.DefaultHttpDataSource
           import androidx.media3.exoplayer.DefaultLoadControl
           import androidx.media3.exoplayer.ExoPlayer
           import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+          import androidx.media3.ui.AspectRatioFrameLayout
           import androidx.media3.ui.PlayerView
           import androidx.mediarouter.app.MediaRouteButton
           import androidx.mediarouter.media.MediaControlIntent
@@ -3196,6 +2793,18 @@ jobs:
               private var listMode = "all"          // all | fav | recent | mine | lock | group
               private var curGroup = "ALL"
               private var autoNext = true
+              private var bgPlay = false
+              private var wasPlaying = false
+              private var savedPos = 0L
+              private var lastItem: MediaItem? = null
+              private val dial = StringBuilder()
+              private var dialTask: Runnable? = null
+              private var searchTask: Runnable? = null
+              private var tvDial: TextView? = null
+              private var btnSpeed: Button? = null
+              private val speeds = floatArrayOf(0.75f, 1f, 1.25f, 1.5f, 2f)
+              private var speedIdx = 1
+              private var resizeIdx = 0
 
               private val shown = ArrayList<Channel>()
               private val groups = ArrayList<Group>()
@@ -3255,6 +2864,7 @@ jobs:
                   decodeChans(sp.s("recents"), recents)
                   loadMine()
                   autoNext = sp.b("auto_next", true)
+                  bgPlay = sp.b("bg_play", false)
                   buildGroups()
                   rvChannels.adapter = chanAdapter
                   rvGroups.adapter = grpAdapter
@@ -3278,11 +2888,12 @@ jobs:
                           }
                       }
                   }
-                  startTicker()
               }
 
               override fun onResume() {
                   super.onResume()
+                  if (!bgPlay && wasPlaying && cur != null && player?.isPlaying != true) resumeLast()
+                  startTicker()
                   receiver = Events.register(this) { type, text ->
                       when (type) {
                           "kicked" -> { toast(text.ifBlank { "انتهت الجلسة" }); finish() }
@@ -3292,9 +2903,32 @@ jobs:
                   }
               }
 
+              /** لا تشغيل في الخلفية: نوقف المشغل تماماً عند مغادرة الشاشة. */
               override fun onPause() {
+                  val p = player
+                  if (p != null) {
+                      wasPlaying = p.isPlaying
+                      savedPos = if (cur?.kind == "live") 0L else p.currentPosition
+                      if (!bgPlay) {
+                          try { p.pause(); p.stop() } catch (t: Throwable) { Crash.log(t) }
+                      }
+                  }
+                  stopTicker(); clearWd()
                   Events.unregister(this, receiver); receiver = null
                   super.onPause()
+              }
+
+              private fun resumeLast() {
+                  val p = player ?: return
+                  val c = cur ?: return
+                  val item = lastItem ?: run { play(c, full); return }
+                  try {
+                      p.setMediaItem(item)
+                      p.prepare()
+                      if (c.kind != "live" && savedPos > 4000) p.seekTo(savedPos)
+                      p.play()
+                      armWd()
+                  } catch (t: Throwable) { Crash.log(t) }
               }
 
               override fun onDestroy() {
@@ -3327,6 +2961,8 @@ jobs:
                   val p = ExoPlayer.Builder(this)
                       .setMediaSourceFactory(DefaultMediaSourceFactory(http))
                       .setLoadControl(load)
+                      .setAudioAttributes(AudioAttributes.DEFAULT, true)   // يوقف عند مكالمة/فقدان التركيز الصوتي
+                      .setHandleAudioBecomingNoisy(true)                   // يوقف عند نزع السماعة
                       .build()
                   p.playWhenReady = true
                   player = p
@@ -3350,8 +2986,27 @@ jobs:
                   retries = 0
                   usingAlt = false
                   pushRecent(c)
-                  val url = c.url.ifBlank { c.alt }
+                  val prof = Catalog.profile
+                  var url = c.url.ifBlank { c.alt }
                   if (url.isBlank()) { toast("لا يوجد رابط تشغيل لهذا العنصر"); return }
+                  // بوابات MAC: كثير من القنوات تعطي cmd داخلي (rtmp/udp/ffmpeg) يجب تحويله قبل التشغيل
+                  if (prof?.type == "mac" && !url.startsWith("http")) {
+                      busy(true, "تجهيز رابط البوابة…")
+                      val f = url
+                      Loader.macPlayable(prof, f) { real ->
+                          runOnUiThread {
+                              busy(false, "")
+                              if (real.isBlank() || real == f) { toast("البوابة لم ترجع رابطاً صالحاً"); return@runOnUiThread }
+                              c.url = real
+                              startUrl(c, real, asFull)
+                          }
+                      }
+                      return
+                  }
+                  startUrl(c, url, asFull)
+              }
+
+              private fun startUrl(c: Channel, url: String, asFull: Boolean) {
                   infoName.text = c.name
                   infoSub.text = listOfNotNull(
                       if (c.group.isBlank()) null else c.group,
@@ -3360,10 +3015,13 @@ jobs:
                   infoDesc.text = "بانتظار البيانات…"
                   val meta = MediaMetadata.Builder().setTitle(c.name).build()
                   val item = MediaItem.Builder().setUri(url).setMediaMetadata(meta).build()
+                  lastItem = item
                   player?.stop()
                   player?.setMediaItem(item)
                   player?.prepare()
                   player?.play()
+                  applyTrackPrefs()
+                  player?.setPlaybackSpeed(speeds[speedIdx])
                   if (asFull && !full) toggleFull(true)
                   if (!full) { dockBusy.visibility = View.VISIBLE; tvLoadPct.text = "0%" }
                   else { fullBusy.visibility = View.VISIBLE; tvFullPct.text = "0%" }
@@ -3741,6 +3399,19 @@ jobs:
               private fun catchup() {
                   val c = cur ?: return
                   val p = Catalog.profile
+                  if (p?.type == "mac") {
+                      busy(true, "تجهيز القبض…")
+                      Loader.macTimeshift(p, c.url.ifBlank { c.alt }, 2) { u ->
+                          runOnUiThread {
+                              busy(false, "")
+                              if (u.isBlank()) { toast("هذه البوابة لا تدعم القبض (timeshift)"); return@runOnUiThread }
+                              c.alt = u
+                              startUrl(c, u, full)
+                              toast("تشغيل منسّي آخر ساعتين")
+                          }
+                      }
+                      return
+                  }
                   if (p == null || p.type != "xtream") {
                       if (c.alt.isNotBlank() && c.alt.contains("catchup")) {
                           player?.setMediaItem(MediaItem.fromUri(c.alt)); player?.prepare(); player?.play()
@@ -3773,6 +3444,108 @@ jobs:
 
               /* ================================ الأدوات ================================ */
 
+              private fun commitDial() {
+                  val txt = dial.toString()
+                  dial.setLength(0)
+                  tvDial?.visibility = View.GONE
+                  val n = txt.toIntOrNull() ?: return
+                  if (n <= 0) return
+                  val t = shown.firstOrNull { it.num == n } ?: shown.getOrNull(n - 1)
+                  if (t == null) { toast("لا توجد القناة رقم $n"); return }
+                  play(t, full)
+                  if (!full) rvChannels.scrollToPosition(shown.indexOf(t).coerceAtLeast(0))
+              }
+
+              /** السرعة للأفلام والحلقات فقط. */
+              private fun cycleSpeed() {
+                  val c = cur
+                  if (c != null && c.kind == "live") { toast("السرعة تعمل مع الأفلام والحلقات فقط"); return }
+                  speedIdx = (speedIdx + 1) % speeds.size
+                  val v = speeds[speedIdx]
+                  try { player?.setPlaybackSpeed(v) } catch (t: Throwable) {}
+                  btnSpeed?.text = "السرعة ${if (v == 1f) "1" else v.toString().trimEnd('0').trimEnd('.')}×"
+              }
+
+              /** اختيار مسار الصوت/الترجمة من داخل التدفّق. */
+              private fun tracksDialog() {
+                  val p = player ?: return
+                  val labels = ArrayList<String>()
+                  val acts = ArrayList<Any?>()
+                  labels.add("تلقائي (حسب الأفضلية)"); acts.add("auto")
+                  try {
+                      for (g in p.currentTracks.groups) {
+                          if (!g.isSupported()) continue
+                          val type = g.type
+                          if (type != C.TRACK_TYPE_AUDIO && type != C.TRACK_TYPE_TEXT) continue
+                          for (i in 0 until g.length) {
+                              val f: Format? = try { g.getTrackFormat(i) } catch (t: Throwable) { null }
+                              val nm = f?.label?.takeIf { it.isNotBlank() }
+                                  ?: f?.language?.takeIf { it.isNotBlank() }
+                                  ?: "مسار ${i + 1}"
+                              val sel = if (g.isTrackSelected(i)) " ✓" else ""
+                              labels.add((if (type == C.TRACK_TYPE_AUDIO) "🔊 " else "💬 ") + nm + sel)
+                              acts.add(TrkSel(g, i))
+                          }
+                      }
+                  } catch (t: Throwable) { Crash.log(t) }
+                  labels.add(if (sp.b("subs_off", false)) "☐ إظهار الترجمة" else "☑ إخفاء الترجمة")
+                  acts.add("subs")
+                  pickDialog("الصوت والترجمة", labels) { i ->
+                      when (val a = acts.getOrNull(i)) {
+                          "auto" -> {
+                              try {
+                                  p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+                                      .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                                      .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                                      .setDisabledTrackTypes(emptySet())
+                                      .build()
+                                  sp.put("subs_off", false)
+                              } catch (t: Throwable) {}
+                          }
+                          "subs" -> {
+                              sp.put("subs_off", !sp.b("subs_off", false))
+                              applyTrackPrefs()
+                              toast(if (sp.b("subs_off", false)) "أُخفيت الترجمة" else "ستظهر الترجمة إن وُجدت")
+                          }
+                          is TrkSel -> {
+                              try {
+                                  p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+                                      .setOverrideForType(TrackSelectionOverride(a.group.getMediaTrackGroup(), a.index))
+                                      .setDisabledTrackTypes(emptySet())
+                                      .build()
+                                  sp.put("subs_off", false)
+                                  toast("تم الاختيار")
+                              } catch (t: Throwable) { toast("هذا المسار غير قابل للاختيار") }
+                          }
+                      }
+                  }
+              }
+
+              private fun applyTrackPrefs() {
+                  val p = player ?: return
+                  try {
+                      val b = p.trackSelectionParameters.buildUpon()
+                      b.clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                      b.clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                      b.setDisabledTrackTypes(if (sp.b("subs_off", false)) setOf(C.TRACK_TYPE_TEXT) else emptySet())
+                      p.trackSelectionParameters = b.build()
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              /** تبديل مقياس الصورة: مناسب للبث الزائد/الجانبي. */
+              private fun cycleResize() {
+                  val modes = intArrayOf(
+                      AspectRatioFrameLayout.RESIZE_MODE_FIT, AspectRatioFrameLayout.RESIZE_MODE_ZOOM,
+                      AspectRatioFrameLayout.RESIZE_MODE_FILL, AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
+                  )
+                  val names = listOf("ملاءمة", "تكبير", "ملء", "عرض ثابت")
+                  resizeIdx = (resizeIdx + 1) % modes.size
+                  try { pv.resizeMode = modes[resizeIdx]; pvFull.resizeMode = modes[resizeIdx] } catch (t: Throwable) {}
+                  toast("مقياس الصورة: " + names[resizeIdx])
+              }
+
+              private class TrkSel(val group: Tracks.Group, val index: Int)
+
               private fun busy(on: Boolean, t: String) {
                   dockBusy.visibility = if (on) View.VISIBLE else View.GONE
                   if (t.isNotEmpty()) tvLoadTxt.text = t
@@ -3781,6 +3554,9 @@ jobs:
               private fun settingsDialog() {
                   val items = listOf(
                       if (autoNext) "☑ تشغيل التالي تلقائيًا" else "☐ تشغيل التالي تلقائيًا",
+                      if (bgPlay) "☐ منع التشغيل في الخلفية" else "☑ منع التشغيل في الخلفية (مطبّق)",
+                      if (sp.b("subs_off", false)) "☑ الترجمة مخفية" else "☐ إخفاء الترجمة",
+                      "مقياس الصورة", "السرعة",
                       if (sp.b("smart_alt", true)) "☑ مصدر بديل ذكي" else "☐ مصدر بديل ذكي",
                       "إعادة تحميل القائمة",
                       "معلومات الجلسة والحساب",
@@ -3790,25 +3566,53 @@ jobs:
                   pickDialog("الإعدادات السريعة", items) { i ->
                       when (i) {
                           0 -> { autoNext = !autoNext; sp.put("auto_next", autoNext); toast(if (autoNext) "التالي تلقائي: مفعّل" else "التالي تلقائي: معطّل") }
-                          1 -> { sp.put("smart_alt", !sp.b("smart_alt", true)); toast("البديل الذكي: " + if (sp.b("smart_alt", true)) "مفعّل" else "معطّل") }
-                          2 -> {
+                          1 -> {
+                              bgPlay = !bgPlay; sp.put("bg_play", bgPlay)
+                              if (!bgPlay) { try { player?.pause(); player?.stop() } catch (t: Throwable) {} }
+                              toast(if (bgPlay) "الصوت سيستمر خارج التطبيق" else "التطبيق يتوقف في الخلفية")
+                          }
+                          2 -> { sp.put("subs_off", !sp.b("subs_off", false)); applyTrackPrefs(); toast(if (sp.b("subs_off", false)) "أُخفيت الترجمة" else "الترجمة مسموحة") }
+                          3 -> cycleResize()
+                          4 -> { val a = ArrayList<String>(); for (v in speeds) a.add("${if (v == 1f) "1" else v}×"); pickDialog("السرعة", a) { k -> speedIdx = k; try { player?.setPlaybackSpeed(speeds[k]) } catch (t: Throwable) {} } }
+                          5 -> { sp.put("smart_alt", !sp.b("smart_alt", true)); toast("البديل الذكي: " + if (sp.b("smart_alt", true)) "مفعّل" else "معطّل") }
+                          6 -> {
                               val p = Catalog.profile ?: Profile.fromJson(JSONObject(sp.s("last", "{}")))
                               Loader.load(this, p, true, { t -> runOnUiThread { tvLoadTxt.text = t } }) { ok, msg ->
                                   if (ok) { buildGroups(); refresh(); toast("تحديث كامل • " + msg) } else toast(msg)
                               }
                           }
-                          3 -> infoDialog("الجلسة", "المستخدم: " + sp.s("auth_user") + "\nالمعرّف: " + sp.s("auth_session") +
+                          7 -> infoDialog("الجلسة", "المستخدم: " + sp.s("auth_user") + "\nالمعرّف: " + sp.s("auth_session") +
                               "\nالسيرفر: " + (Catalog.profile?.url ?: "-") + "\nالنوع: " + (Catalog.profile?.type ?: "-") +
                               "\nالانتهاء: " + Catalog.expiry + "\nالحالة: " + Catalog.status + "\nFCM: " + sp.s("fcm", "-").take(20))
-                          4 -> inputDialog("رمز القفل", "4 أرقام", null, v1 = "", msg = "الرمز الحالي: " + sp.s("lock_code", "0000")) { code, _ ->
+                          8 -> inputDialog("رمز القفل", "4 أرقام", null, v1 = "", msg = "الرمز الحالي: " + sp.s("lock_code", "0000")) { code, _ ->
                               if (code.length >= 3) { sp.put("lock_code", code); toast("تم تغيير الرمز") } else toast("قصير جدًا")
                           }
-                          5 -> { recents.clear(); sp.put("recents", "[]"); buildGroups(); refresh(); toast("مُسح السجل") }
+                          9 -> { recents.clear(); sp.put("recents", "[]"); buildGroups(); refresh(); toast("مُسح السجل") }
                       }
                   }
               }
 
               override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+                  // كتابة رقم القناة مباشرة (سلوك التلفاز)
+                  if (keyCode in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9) {
+                      if (dial.length < 4) {
+                          dial.append((keyCode - KeyEvent.KEYCODE_0).toString())
+                          tvDial?.text = dial.toString()
+                          tvDial?.visibility = View.VISIBLE
+                          dialTask?.let { h.removeCallbacks(it) }
+                          val r = Runnable { commitDial() }
+                          dialTask = r
+                          h.postDelayed(r, 1300)
+                      }
+                      return true
+                  }
+                  // تنقل بين القنوات بالأسهم داخل المشغل
+                  if (full || pv.hasFocus()) {
+                      when (keyCode) {
+                          KeyEvent.KEYCODE_DPAD_DOWN -> { next(false); showBars(); return true }
+                          KeyEvent.KEYCODE_DPAD_UP -> { prev(); showBars(); return true }
+                      }
+                  }
                   when (keyCode) {
                       KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> {
                           val p = player ?: return false
@@ -3870,15 +3674,27 @@ jobs:
                   ivPip = findViewById(R.id.iv_pip)
                   castBtn = findViewById(R.id.castBtn)
 
+                  tvDial = findViewById(R.id.tvDial)
                   rvChannels.layoutManager = LinearLayoutManager(this)
                   rvGroups.layoutManager = LinearLayoutManager(this)
+                  // أداء أفضل مع القوائم الضخمة
+                  rvChannels.setHasFixedSize(true)
+                  rvChannels.itemAnimator = null
+                  rvGroups.itemAnimator = null
+                  try { rvChannels.recycledViewPool.setMaxRecycledViews(0, 26) } catch (t: Throwable) {}
+                  (rvChannels.layoutManager as? LinearLayoutManager)?.initialPrefetchItemCount = 10
                   chanAdapter = ChanAdapter()
                   grpAdapter = GrpAdapter()
                   rvChannels.adapter = chanAdapter
                   rvGroups.adapter = grpAdapter
 
                   etSearch.addTextChangedListener(object : android.text.TextWatcher {
-                      override fun afterTextChanged(s: android.text.Editable?) { refresh() }
+                      override fun afterTextChanged(s: android.text.Editable?) {
+                          searchTask?.let { h.removeCallbacks(it) }
+                          val r = Runnable { refresh() }
+                          searchTask = r
+                          h.postDelayed(r, 240)   // تفادي إعادة الفرز مع كل حرف (قوائم 50 ألف قناة)
+                      }
                       override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                       override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                   })
@@ -3903,6 +3719,10 @@ jobs:
                   findViewById<Button>(R.id.btn_dock_full).setOnClickListener { toggleFull(true) }
                   findViewById<Button>(R.id.btn_dock_fav).setOnClickListener { toggleFav() }
                   findViewById<Button>(R.id.btn_dock_catch).setOnClickListener { catchup() }
+                  btnSpeed = findViewById(R.id.btn_speed)
+                  findViewById<Button>(R.id.btn_speed).setOnClickListener { cycleSpeed() }
+                  findViewById<Button>(R.id.btn_tracks).setOnClickListener { tracksDialog() }
+                  findViewById<Button>(R.id.btn_quality).setOnClickListener { cycleResize() }
                   findViewById<Button>(R.id.btn_prev).setOnClickListener { prev() }
                   findViewById<Button>(R.id.btn_next).setOnClickListener { next(false) }
                   findViewById<Button>(R.id.btn_play).setOnClickListener {
@@ -4193,7 +4013,6 @@ jobs:
                   findViewById<Button>(R.id.btn_direct).setOnClickListener {
                       sp.put("auth_user", sp.s("guest_user", "guest")); fillServerForm(); show("server")
                   }
-                  findViewById<View>(R.id.btn_admin_open).setOnClickListener { openAdmin() }
                   findViewById<View>(R.id.btn_update_open).setOnClickListener { checkUpdate(true) }
                   findViewById<View>(R.id.btn_theme_toggle).setOnClickListener {
                       sp.put("theme", if (sp.s("theme", "night") == "night") "day" else "night")
@@ -4222,7 +4041,6 @@ jobs:
                   findViewById<View>(R.id.tile_switch).setOnClickListener { fillServerForm(); show("server") }
                   findViewById<View>(R.id.tile_reload).setOnClickListener { startLoad(true) }
                   findViewById<View>(R.id.tile_exit).setOnClickListener { finishAffinity() }
-                  findViewById<View>(R.id.tile_admin).setOnClickListener { openAdmin() }
                   findViewById<View>(R.id.tile_update).setOnClickListener { checkUpdate(true) }
                   findViewById<View>(R.id.tile_settings).setOnClickListener { openSettings() }
                   findViewById<View>(R.id.tile_account).setOnClickListener { openAccount() }
@@ -4440,24 +4258,6 @@ jobs:
                   startActivity(i)
               }
 
-              private fun openAdmin() {
-                  val u = sp.s("auth_user")
-                  val local = u == sp.s("admin_user", "admin")
-                  if (!local && !Remote.ready() && u.isEmpty()) {
-                      inputDialog("دخول الأدمن", "المستخدم", "كلمة المرور", v1 = "", msg = "الافتراضي admin / admin123 (محلي)") { a, b ->
-                          if (a == sp.s("admin_user", "admin") && b == sp.s("admin_pass", "admin123")) {
-                              sp.put("auth_user", a); adminGo()
-                          } else toast("بيانات غير صحيحة")
-                      }
-                      return
-                  }
-                  adminGo()
-              }
-
-              private fun adminGo() {
-                  startActivity(android.content.Intent(this, AdminActivity::class.java))
-              }
-
               private fun openAccount() {
                   val p = currentProfile()
                   val u = sp.s("auth_user")
@@ -4482,6 +4282,7 @@ jobs:
 
               private fun openSettings() {
                   val items = listOf(
+                      if (sp.b("bg_play", false)) "☐ إيقاف التشغيل في الخلفية (مفعّل حالياً)" else "☑ منع التشغيل في الخلفية (مطبّق)",
                       "محاولة ذكية للتحميل (بديل)\uFE0E", "تبديل الثيم (Crystal / Maroon)", "تحميل جديد إجباري",
                       "مسح المفضلة", "مسح سجل المشاهدة", "حذف ذاكرة الكاش", "سجل الأعطال", "حالة الذاكرة",
                       "التحقق من التحديث", "حول التطبيق"
@@ -4489,26 +4290,30 @@ jobs:
                   pickDialog("الإعدادات", items) { i ->
                       when (i) {
                           0 -> {
+                              sp.put("bg_play", !sp.b("bg_play", false))
+                              toast(if (sp.b("bg_play", false)) "سيستمر الصوت عند الخروج من التطبيق" else "التطبيق يتوقف في الخلفية")
+                          }
+                          1 -> {
                               sp.put("smart_alt", !sp.b("smart_alt", true))
                               toast("المصدر البديل: " + if (sp.b("smart_alt", true)) "مفعّل" else "معطّل")
                           }
-                          1 -> {
+                          2 -> {
                               sp.put("theme", if (sp.s("theme", "night") == "night") "day" else "night")
                               (getApplication() as NovaApp).applyTheme(); recreate()
                           }
-                          2 -> startLoad(true)
-                          3 -> { sp.put("favs", "[]"); toast("مسحت المفضلة") }
-                          4 -> { sp.put("recents", "[]"); toast("مسحت السجل") }
-                          5 -> { Memory.trim(this, true); toast("نُظّف الكاش") }
-                          6 -> {
+                          3 -> startLoad(true)
+                          4 -> { sp.put("favs", "[]"); toast("مسحت المفضلة") }
+                          5 -> { sp.put("recents", "[]"); toast("مسحت السجل") }
+                          6 -> { Memory.trim(this, true); toast("نُظّف الكاش") }
+                          7 -> {
                               val log = Crash.read(this)
                               AlertDialog.Builder(this).setTitle("سجل الأعطال").setMessage(log)
                                   .setPositiveButton("مسح السجل") { _, _ -> Crash.clear(this); toast("مُسح") }
                                   .setNegativeButton("إغلاق", null).show()
                           }
-                          7 -> infoDialog("الذاكرة", Memory.dump(this))
-                          8 -> checkUpdate(true)
-                          9 -> infoDialog("NovaPlay", "مشغّل IPTV — Kotlin + media3\n" +
+                          8 -> infoDialog("الذاكرة", Memory.dump(this))
+                          9 -> checkUpdate(true)
+                          10 -> infoDialog("NovaPlay", "مشغّل IPTV — Kotlin + media3\n" +
                               "الثيم: Crystal Black × Gold / Nova Maroon\n" + appVersion(this) +
                               "\nكل شيء يعمل داخل ملف GitHub Actions واحد.")
                       }
@@ -4806,164 +4611,366 @@ jobs:
               }
           }
 
-          /** عميل بوابات MAC / Stalker (load.php). */
+          /**
+           * عميل بوابات MAC / Stalker (load.php).
+           * يطابق دالة البوابة الحقيقية: handshake(pre_auth) → get_profile(result.status) → البوابات،
+           * مع نسختين من الترويسات (بعض البوابات ترفض النسخة القياسية) و create_link لتشغيل الروابط الداخلية.
+           */
           class Stalker(private val baseIn: String, private val mac: String) {
               private val base = baseIn.trimEnd('/')
-              private val ua = "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko)"
-              private val cookie = "mac=$mac; stb_lang=ar; timezone=Europe/London"
+
               var token = ""
                   private set
+              var accountStatus = ""
+                  private set
+              var lastError = ""
+                  private set
+              var totalPages = 1
+                  private set
+              var totalItems = 0
+                  private set
 
-              private fun hdr(auth: Boolean = true): Map<String, String> {
+              /** 0 = الترويسات القياسية لجهاز STB، 1 = النسخة المقلوبة التي تستعملها بعض البوابات. */
+              private var variant = 0
+              private var probed = false
+
+              private fun headers(auth: Boolean = true): Map<String, String> {
                   val m = HashMap<String, String>()
-                  m["User-Agent"] = ua
-                  m["Cookie"] = cookie
-                  m["X-User-Agent"] = "Model: MAG250; Link: WiFi"
+                  m["Cookie"] = "mac=$mac; stb_lang=ar; timezone=Europe/Paris"
+                  if (variant == 0) {
+                      m["User-Agent"] = "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG200 stbapp ver: 2 rev: 250 Safari/533.3"
+                      m["X-User-Agent"] = "Model: MAG250; Link: WiFi"
+                  } else {
+                      m["User-Agent"] = "Mozilla/5.0 (Linux armv7l) gsoap/2.8 (STB, Linux) Qt/4.8"
+                      m["X-User-Agent"] = "Mozilla/5.0 (QtEmbedded; Linux; C)"
+                  }
                   if (auth && token.isNotEmpty()) m["Authorization"] = "Bearer $token"
+                  m["Accept"] = "application/json, text/plain, */*"
                   return m
               }
 
-              private fun q(path: String) = "$base/server/load.php?$path&JsHttpRequest=1-xml"
-
-              /** يصيب: handshake ثم القنوات ثم التصنيفات. يرجع نص الاستجابة لكل مرحلة. */
-              fun handshake() {
-                  val r = Http.read(q("type=stb&action=handshake&token=&mac=&verifyCode=&ds=null"), hdr(false))
-                  try {
-                      val js = JSONObject(r).opt("js")
-                      token = when (js) {
-                          is JSONObject -> js.optString("token")
-                          is String -> js
-                          else -> ""
-                      }
-                  } catch (t: Throwable) {}
-                  try { Http.read(q("type=stb&action=profile&js=null"), hdr()) } catch (t: Throwable) {}
+              /** رابط +JsHttpRequest، مع إعادة محاولة بالترويسات الأخرى عند الفشل. */
+              private fun raw(path: String, auth: Boolean): String {
+                  val u = if (path.contains("JsHttpRequest")) path else "$path&JsHttpRequest=1-xml"
+                  val url = "$base/server/load.php?$u"
+                  return try {
+                      Http.read(url, headers(auth), timeoutMs = 14000, retries = 1)
+                  } catch (t: Throwable) {
+                      lastError = t.message ?: t.javaClass.simpleName
+                      throw t
+                  }
               }
 
+              /** قراءة مع تبديل تلقائي لنسخة الترويسات إذا رفضت البوابة الأولى. */
+              private fun get(path: String, auth: Boolean = true): String? {
+                  return try {
+                      raw(path, auth)
+                  } catch (t: Throwable) {
+                      if (variant == 0) {
+                          variant = 1
+                          try { raw(path, auth) } catch (t2: Throwable) { variant = 0; null }
+                      } else null
+                  }
+              }
+
+              // ----------------------------- التحليل -----------------------------
+
+              /** يعيد عقدة البيانات أياً كان شكلها: js / result / js.data / المتجذر. */
+              private fun node(json: String?): Any? {
+                  if (json.isNullOrBlank()) return null
+                  return try {
+                      val o = JSONObject(json)
+                      when {
+                          o.optJSONObject("js") != null -> o.optJSONObject("js")
+                          o.optJSONArray("js") != null -> o.optJSONArray("js")
+                          o.optJSONObject("result") != null -> o.optJSONObject("result")
+                          o.optJSONArray("result") != null -> o.optJSONArray("result")
+                          else -> o
+                      }
+                  } catch (t: Throwable) {
+                      json.takeIf { it.trim().startsWith("http") }
+                  }
+              }
+
+              /** قائمة العناصر داخل أي مخطط (data / list / categories / array مباشر). */
+              private fun items(json: String?): List<JSONObject> {
+                  val out = ArrayList<JSONObject>()
+                  var n: Any? = node(json)
+                  val o = n as? JSONObject
+                  if (o != null) {
+                      var arr: JSONArray? = null
+                      for (k in listOf("data", "list", "categories", "channels", "items")) {
+                          val a = o.optJSONArray(k)
+                          if (a != null && a.length() > 0) { arr = a; break }
+                      }
+                      if (arr == null) {
+                          // get_filter: التصنيفات داخل filters
+                          val f = o.optJSONObject("filters")
+                          if (f != null) arr = f.optJSONArray("categories") ?: f.optJSONArray("genres")
+                      }
+                      if (arr != null) n = arr
+                      if (arr == null && o.length() > 0 && o.optJSONArray("data") == null) {
+                          // خريطة id → {title}
+                          val keys = o.keys()
+                          while (keys.hasNext()) {
+                              val k = keys.next()
+                              val v = o.opt(k)
+                              if (v is JSONObject) {
+                                  if (v.optString("id").isBlank() && v.optString("title").isNotBlank()) v.put("id", k)
+                                  out.add(v)
+                              }
+                          }
+                          if (out.isNotEmpty()) return out
+                      }
+                  }
+                  val a = n as? JSONArray
+                  if (a != null) {
+                      for (i in 0 until a.length()) {
+                          val o2 = a.optJSONObject(i)
+                          if (o2 != null) out.add(o2)
+                      }
+                  } else if (o != null && out.isEmpty()) out.add(o)
+                  return out
+              }
+
+              private fun totalOf(json: String?) {
+                  totalPages = 1; totalItems = 0
+                  val n = node(json) as? JSONObject ?: return
+                  totalItems = n.optInt("total", n.optInt("pages", 0))
+                  val tp = n.opt("totalPages")
+                  when (tp) {
+                      is Int -> totalPages = tp
+                      is String -> totalPages = tp.toIntOrNull() ?: 1
+                  }
+                  if (totalPages < 1) totalPages = 1
+              }
+
+              // ----------------------------- الاتصال -----------------------------
+
+              /** handshake ثم get_profile. يعيد true إذا تم obtaining token صالح. */
+              fun connect(): Boolean {
+                  if (probed) return token.isNotEmpty()
+                  probed = true
+                  val paths = listOf(
+                      "type=stb&action=handshake&pre_auth=1&mac=$mac",
+                      "type=stb&action=handshake&token=&mac=$mac",
+                      "type=stb&action=handshake&mac=$mac"
+                  )
+                  for (v in intArrayOf(0, 1)) {
+                      variant = v
+                      for (pth in paths) {
+                          val r = get(pth, auth = false) ?: continue
+                          val tok = tokenOf(r)
+                          if (!tok.isNullOrEmpty()) { token = tok; break }
+                      }
+                      if (token.isEmpty()) continue
+                      val prof = get("type=stb&action=get_profile&mac=$mac")
+                      if (prof != null) {
+                          val st = statusOf(prof)
+                          accountStatus = st
+                          if (st.isNotEmpty() && st != "1" && !st.equals("ok", true) && !st.equals("active", true)) {
+                              lastError = "حالة الحساب في البوابة: $st"
+                              return false
+                          }
+                      }
+                      return true
+                  }
+                  if (lastError.isEmpty()) lastError = "فشل المصافحة مع البوابة (handshake)"
+                  return false
+              }
+
+              private fun tokenOf(json: String): String? {
+                  return try {
+                      val o = JSONObject(json)
+                      val js = o.opt("js")
+                      when (js) {
+                          is String -> if (js.length > 8) js else null
+                          is JSONObject -> js.optString("token").ifBlank { js.optJSONObject("auth")?.optString("token") ?: "" }.ifBlank { null }
+                          else -> o.optString("token").ifBlank { null }
+                      }
+                  } catch (t: Throwable) { null }
+              }
+
+              private fun statusOf(json: String): String {
+                  return try {
+                      val o = JSONObject(json)
+                      listOf(
+                          o.optJSONObject("result")?.optString("status"),
+                          (o.optJSONObject("js") as? JSONObject)?.optString("status"),
+                          o.optString("status")
+                      ).firstOrNull { !it.isNullOrBlank() } ?: ""
+                  } catch (t: Throwable) { "" }
+              }
+
+              // ----------------------------- البيانات -----------------------------
+
+              /** القنوات المباشرة مع خريطة التصنيفات. */
               fun channels(live: MutableList<Channel>): Int {
                   live.clear()
-                  var n = 0
+                  val genres = HashMap<String, String>()
                   try {
-                      val arr = dataList(Http.read(q("type=itv&action=get_all_channels&number=0"), hdr()))
-                      val genres = HashMap<String, String>()
-                      try {
-                          for (o in dataList(Http.read(q("type=itv&action=get_genres"), hdr()))) {
-                              genres[o.optString("id")] = o.optString("title")
-                          }
-                      } catch (t: Throwable) {}
-                      for (o in arr) {
+                      for (o in items(get("type=itv&action=get_genres"))) {
+                          val id = o.optString("id")
+                          val title = o.optString("title", o.optString("name"))
+                          if (id.isNotEmpty() && title.isNotEmpty()) genres[id] = title
+                      }
+                  } catch (t: Throwable) { Crash.log(t) }
+                  var n = 0
+                  for (page in 0..1) {
+                      val r = try { get("type=itv&action=get_all_channels&number=$page") } catch (t: Throwable) { Crash.log(t); null }
+                      if (r == null) break
+                      val list = items(r)
+                      if (list.isEmpty()) break
+                      for (o in list) {
                           val c = Channel()
                           c.kind = "live"
                           c.num = ++n
                           c.name = o.optString("name").ifBlank { o.optString("num") }
-                          c.url = o.optString("cmd")
                           c.id = o.optString("id")
+                          c.url = o.optString("cmd").ifBlank { o.optString("media_url") }
                           val gid = o.optString("tv_genre_id")
-                          c.group = genres[gid] ?: "عام"
+                          c.group = genres[gid] ?: o.optString("tv_genre", "عام").ifBlank { "عام" }
                           c.logo = o.optString("logo")
                           c.extra = o.optString("num")
                           if (c.url.isBlank()) continue
                           live.add(c)
                       }
-                  } catch (t: Throwable) { Crash.log(t) }
+                  }
                   return n
               }
 
+              /** تصنيفات (أقسام) الأفلام أو المسلسلات — مع سلاسل احتياطية لأن البوابات تختلف. */
               fun categories(kind: String): List<Group> {
-                  val t = if (kind == "movie") "vod" else "series"
-                  val out = ArrayList<Group>()
-                  try {
-                      for (o in dataList(Http.read(q("type=$t&action=get_categories"), hdr()))) {
-                          out.add(Group().apply {
-                              name = o.optString("title").ifBlank { "غير مصنّف" }
-                              catId = o.optString("id")
-                              count = o.optInt("total")
-                          })
+                  val cands = if (kind == "movie")
+                      listOf("type=vod&action=get_categories", "type=vod&action=get_filter", "type=itv&action=get_filter")
+                  else
+                      listOf("type=series&action=get_categories", "type=series&action=get_filter", "type=vod&action=get_categories", "type=vod&action=get_filter")
+                  for (path in cands) {
+                      val r = try { get(path) } catch (t2: Throwable) { Crash.log(t2); null } ?: continue
+                      val out = ArrayList<Group>()
+                      for (o in items(r)) {
+                          val id = o.optString("id")
+                          val title = o.optString("title").ifBlank { o.optString("name") }
+                          if (id.isBlank() || title.isBlank()) continue
+                          out.add(Group().apply { name = title; catId = id; count = o.optInt("total") })
                       }
-                  } catch (t: Throwable) { Crash.log(t) }
-                  return out
+                      if (out.isNotEmpty()) {
+                          if (out.none { it.catId == "0" }) out.add(0, Group().apply { name = "ALL"; catId = "0"; special = "all"; count = 0 })
+                          return out
+                      }
+                  }
+                  // البوابة لا تكشف التصنيفات: نترك «الكل» لتصفّح كل المحتوى
+                  return listOf(Group().apply { name = "ALL"; catId = "0"; special = "all"; count = 0 })
               }
 
-              fun ordered(kind: String, catId: String, page: Int, out: MutableList<Channel>): Int {
+              /** تُستدعى مرة واحدة لكل نوع: بعض البوابات تشترط ضبط الفلاتر قبل get_ordered_list. */
+              private val filterDone = HashSet<String>()
+
+              /** قائمة مرتّبة (صفحة واحدة) لعنصر/فيلم/مسلسل داخل تصنيف، مع صيغ استعلام بديلة. */
+              fun ordered(kind: String, catId: String, page: Int, search: String, extra: String, out: MutableList<Channel>): Int {
                   val t = if (kind == "movie") "vod" else "series"
+                  if (filterDone.add(t)) {
+                      try { get("type=$t&action=get_filter&number=0") } catch (t2: Throwable) { Crash.log(t2) }
+                  }
+                  val pg = Math.max(1, page)
+                  val q = if (search.isNotBlank()) "&search=" + Uri.encode(search) else ""
+                  val g = if (catId.isNotBlank() && catId != "0") "&genre=$catId" else ""
+                  // صيغ الاستعلام تختلف بين البوابات: p + sortby + detailed / بدونها / number بدل p
+                  val cands = ArrayList<String>()
+                  cands.add("type=$t&action=get_ordered_list$g&p=$pg&sortby=posted&detailed=1$q")
+                  cands.add("type=$t&action=get_ordered_list$g&p=$pg&q=$pg$q&sortby=added&detailed=1")
+                  cands.add("type=$t&action=get_ordered_list$g&p=$pg$q")
+                  cands.add("type=$t&action=get_ordered_list$g&number=$pg$q&fltt=2")
+                  if (extra.isNotBlank()) {
+                      val base = "type=$t&action=get_ordered_list$g&p=$pg&sortby=posted&detailed=1&$extra"
+                      cands.add(0, base)
+                  }
+                  var last: String? = null
+                  var r: String? = null
+                  for (cand in cands) {
+                      val resp = try { get(cand) } catch (t2: Throwable) { Crash.log(t2); null } ?: continue
+                      last = resp
+                      if (items(resp).isNotEmpty()) { r = resp; break }
+                  }
+                  if (r == null) {
+                      if (last == null && lastError.isEmpty()) lastError = "البوابة لم ترجع قائمة ($t)"
+                      return 0
+                  }
+                  totalOf(r)
                   var n = 0
-                  try {
-                      for (o in dataList(Http.read(q("type=$t&action=get_ordered_list&genre=$catId&p=$page&sortby=posted&detailed=1"), hdr()))) {
-                          val c = Channel()
-                          c.kind = kind
-                          c.num = ++n
-                          c.name = o.optString("name").ifBlank { o.optString("title") }
-                          c.id = o.optString("id")
-                          c.url = o.optString("cmd").ifBlank { o.optString("media_url") }
-                          c.alt = o.optString("screenshot")
-                          c.logo = o.optString("screenshot")
-                          c.catId = catId
-                          c.group = o.optString("category_name")
-                          c.extra = o.optString("description").take(300)
-                          if (c.url.isBlank()) continue
-                          out.add(c)
-                      }
-                  } catch (t: Throwable) { Crash.log(t) }
+                  for (o in items(r)) {
+                      val c = Channel()
+                      c.kind = kind
+                      c.num = ++n
+                      c.name = o.optString("name").ifBlank { o.optString("title") }
+                      c.id = o.optString("id")
+                      c.url = o.optString("cmd").ifBlank { o.optString("media_url").ifBlank { o.optString("url") } }
+                      c.alt = o.optString("screenshot").ifBlank { o.optString("cover") }
+                      c.logo = c.alt
+                      c.catId = catId
+                      c.group = o.optString("category_name").ifBlank { o.optString("genres") }
+                      c.extra = listOf(
+                          o.optString("year"), o.optString("rating"),
+                          o.optString("description").take(140)
+                      ).filter { it.isNotBlank() }.joinToString(" • ")
+                      if (c.name.isBlank()) continue
+                      out.add(c)
+                  }
+                  return out.size
+              }
+
+              /** حلقات مسلسل (بوابات Stalker تخزّن الحلقات تحت vod مع series_id). */
+              fun episodes(seriesId: String, out: MutableList<Channel>): Int {
+                  var n = ordered("movie", "0", 1, "", "series_id=$seriesId", out)
+                  if (n == 0) n = ordered("series", "0", 1, "", "series_id=$seriesId", out)
                   return n
               }
 
-              fun info(kind: String, id: String, out: MutableList<Channel>, x: Stalker? = null): Int {
+              /** يستخرج رابط التشغيل الحقيقي لعنصر بلا cmd. */
+              fun resolve(kind: String, id: String): String {
                   val t = if (kind == "movie") "vod" else "series"
-                  var n = 0
-                  try {
-                      val o = JSONObject(Http.read(q("type=$t&action=get_info_from_list&id=$id"), hdr())).opt("js")
-                      if (o is JSONObject) {
-                          val arr = o.optJSONArray("files")
-                          if (arr != null) {
-                              for (i in 0 until arr.length()) {
-                                  val f = arr.getJSONObject(i)
-                                  val c = Channel()
-                                  c.kind = "episode"
-                                  c.num = ++n
-                                  c.name = f.optString("title").ifBlank { "ملف ${i + 1}" }
-                                  c.url = f.optString("url")
-                                  if (c.url.isBlank()) continue
-                                  out.add(c)
-                              }
-                          } else {
-                              val c = Channel()
-                              c.kind = kind
-                              c.num = 1
-                              c.name = o.optString("name")
-                              c.url = o.optString("cmd").ifBlank { o.optString("media_url") }
-                              if (c.url.isNotBlank()) { out.add(c); n = 1 }
+                  for (a in listOf("get_info_from_list", "get_info", "get_play_list")) {
+                      val r = try { get("type=$t&action=$a&id=$id") } catch (t2: Throwable) { null } ?: continue
+                      val n = node(r)
+                      val src = if (n is JSONArray && n.length() > 0) n.optJSONObject(0) else n as? JSONObject
+                      if (src != null) {
+                          for (k in listOf("media_url", "cmd", "url", "download_url")) {
+                              val v = src.optString(k)
+                              if (v.startsWith("http")) return v
+                          }
+                          val inner = src.optJSONObject("js")
+                          if (inner != null) {
+                              val v = inner.optString("cmd")
+                              if (v.startsWith("http")) return v
                           }
                       }
-                  } catch (t2: Throwable) { Crash.log(t2) }
-                  return n
+                  }
+                  return ""
               }
 
-              /** يرجع قائمة الكائنات من `js` (سواء كانت مصفوفة أو {data:[...] }). */
-              private fun dataList(json: String?): List<JSONObject> {
-                  if (json.isNullOrBlank()) return emptyList()
-                  val out = ArrayList<JSONObject>()
-                  try {
-                      val node = JSONObject(json).opt("js")
-                      var arr: JSONArray? = null
-                      when (node) {
-                          is JSONArray -> arr = node
-                          is JSONObject -> {
-                              arr = node.optJSONArray("data")
-                              if (arr == null) {
-                                  val nested = node.optJSONObject("data")?.optJSONArray("list")
-                                  if (nested != null) arr = nested
-                              }
-                              if (arr == null && node.optJSONArray("categories") != null) arr = node.optJSONArray("categories")
-                          }
-                      }
-                      if (arr == null && node is JSONObject) out.add(node)
-                      if (arr != null) for (i in 0 until arr.length()) {
-                          val o = arr.optJSONObject(i)
-                          if (o != null) out.add(o)
-                      }
-                  } catch (t: Throwable) { Crash.log(t) }
-                  return out
+              /** يحوّل cmd الداخلي (rtmp/udp/ffmpeg) إلى رابط HTTP قابل للتشغيل. */
+              fun playable(cmd: String): String {
+                  val c = cmd.trim()
+                  if (c.startsWith("http")) return c
+                  val r = try { get("type=itv&action=create_link&cmd=" + Uri.encode(c) + "&forced_country=") } catch (t: Throwable) { null }
+                      ?: return c
+                  val n = node(r)
+                  val field = when (n) {
+                      is JSONObject -> n.optString("cmd").ifBlank { n.optJSONObject("data")?.optString("cmd") ?: "" }
+                      else -> r
+                  }
+                  val m = Regex("https?://[^\\s\"']+").find(field)
+                  return m?.value ?: c
               }
 
+              /** رابط القبض (timeshift) للبوابات التي تدعمه. */
+              fun timeshift(cmd: String, hours: Int): String {
+                  val c = cmd.trim()
+                  val r = try { get("type=itv&action=create_link&cmd=" + Uri.encode(c) + "&js_price=0&forced_country=&timeshift=" + (hours * 3600)) } catch (t: Throwable) { null }
+                  val n = node(r) as? JSONObject
+                  val field = n?.optString("cmd") ?: ""
+                  return (Regex("https?://[^\\s\"']+").find(field)?.value) ?: ""
+              }
           }
 
           /** ما يُحمَّل من السيرفر ويُشارك بين الشاشات. */
@@ -5119,26 +5126,86 @@ jobs:
               private fun loadMac(p: Profile, progress: (String) -> Unit) {
                   val s = Stalker(p.url, p.mac)
                   progress("مصافحة البوابة…")
-                  s.handshake()
+                  if (!s.connect()) throw java.io.IOException(s.lastError.ifBlank { "تعذّر الاتصال بالبوّابة" })
                   progress("قائمة القنوات…")
                   s.channels(Catalog.live)
-                  Catalog.liveCats.clear()
-                  Catalog.liveCats.addAll(Catalog.live.groupBy { it.group }.map { Group().apply { name = it.key; count = it.value.size } }.sortedBy { it.name.lowercase() })
-                  progress("تصنيفات الأفلام…")
+                  progress("أقسام الأفلام…")
                   Catalog.movieCats.clear(); Catalog.movieCats.addAll(s.categories("movie"))
-                  progress("تصنيفات المسلسلات…")
+                  progress("أقسام المسلسلات…")
                   Catalog.seriesCats.clear(); Catalog.seriesCats.addAll(s.categories("series"))
+                  Catalog.status = if (s.accountStatus.isEmpty()) "متصل" else "حالة الحساب: " + s.accountStatus
               }
 
-              fun macOrdered(ctx: Context, p: Profile, kind: String, catId: String, out: MutableList<Channel>, cb: (Int) -> Unit) {
+              fun macOrdered(p: Profile, kind: String, catId: String, page: Int, search: String, out: MutableList<Channel>, cb: (Int, Int) -> Unit) {
+                  Bg.pool.execute {
+                      var n = 0
+                      var pages = 1
+                      var err = ""
+                      try {
+                          val s = Stalker(p.url, p.mac)
+                          if (!s.connect()) throw java.io.IOException(s.lastError.ifBlank { "فشل المصافحة" })
+                          if (catId == "all") {
+                              val cats = s.categories(kind)
+                              if (cats.size > 1) {
+                                  Catalog.movieCats.clear(); Catalog.seriesCats.clear()
+                                  if (kind == "movie") Catalog.movieCats.addAll(cats) else Catalog.seriesCats.addAll(cats)
+                              }
+                          }
+                          n = s.ordered(kind, catId, page, search, "", out)
+                          pages = s.totalPages
+                          if (n == 0) err = s.lastError
+                      } catch (t: Throwable) { Crash.log(t); err = t.message ?: t.javaClass.simpleName }
+                      val fcount = n; val fpages = pages
+                      val ferr = err
+                      Bg.ui { cb(fcount, fpages) }
+                      if (ferr.isNotEmpty()) android.util.Log.w("NovaPlay", "mac ordered: $ferr")
+                  }
+              }
+
+              fun macEpisodes(p: Profile, seriesId: String, out: MutableList<Channel>, cb: (Int) -> Unit) {
                   Bg.pool.execute {
                       var n = 0
                       try {
                           val s = Stalker(p.url, p.mac)
-                          s.handshake()
-                          n = s.ordered(kind, catId, 1, out)
+                          if (s.connect()) n = s.episodes(seriesId, out)
                       } catch (t: Throwable) { Crash.log(t) }
                       Bg.ui { cb(n) }
+                  }
+              }
+
+              fun macResolve(p: Profile, kind: String, id: String, cb: (String) -> Unit) {
+                  Bg.pool.execute {
+                      var u = ""
+                      try {
+                          val s = Stalker(p.url, p.mac)
+                          if (s.connect()) u = s.resolve(kind, id)
+                      } catch (t: Throwable) { Crash.log(t) }
+                      Bg.ui { cb(u) }
+                  }
+              }
+
+              /** رابط القبض (timeshift) لبوابات MAC. */
+              fun macTimeshift(p: Profile, cmd: String, hours: Int, cb: (String) -> Unit) {
+                  Bg.pool.execute {
+                      var u = ""
+                      try {
+                          val st = Stalker(p.url, p.mac)
+                          if (st.connect()) u = st.timeshift(cmd, hours)
+                      } catch (t: Throwable) { Crash.log(t) }
+                      Bg.ui { cb(u) }
+                  }
+              }
+
+              /** يحوّل cmd البوابة الداخلي إلى رابط HTTP وقت التشغيل. */
+              fun macPlayable(p: Profile, cmd: String, cb: (String) -> Unit) {
+                  if (cmd.startsWith("http")) { Bg.ui { cb(cmd) }; return }
+                  Bg.pool.execute {
+                      var u = cmd
+                      try {
+                          val s = Stalker(p.url, p.mac)
+                          if (s.connect()) u = s.playable(cmd)
+                      } catch (t: Throwable) { Crash.log(t) }
+                      Bg.ui { cb(u) }
                   }
               }
 
@@ -5249,7 +5316,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.2 (code 82)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.3 (code 83)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
