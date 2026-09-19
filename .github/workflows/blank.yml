@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.17"
-      VERSION_CODE: "817"
+      VERSION_NAME: "8.18"
+      VERSION_CODE: "818"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 817)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.17")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 818)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.18")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -335,6 +335,16 @@ jobs:
           | **خطأ البناء في 8.16** | سطر واحد في `applyResize`: كُتب `val af = AspectRatioFrameLayout` ثم `af.RESIZE_MODE_ZOOM`. في Kotlin **لا يمكن وضع صنف في متغيّر** ثم قراءة ثوابته ⇒ صار مباشرًا: `androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM` |
           | **حتى لا يتكرّر** | صار عندي فحص جديد قبل الإرسال: تصريف الملفات الأربعة (Sources/Core/Grid/Live) مع بدائل AndroidX/media3/Glide ⇒ **0 خطأ** (وقد نجح على هذه النسخة) |
           | **تعديلات 8.16 باقية** | الصورة مضبوطة (ملاءمة افتراضية + تصحيح تلقائي 16:9)، إخفاء الشريط العلوي/الشعار، الرجوع للقسم بنفس العنصر، المواسم والحلقات مرتّبة ودقيقة، متابعة المشاهدة |
+
+          ## 8.18 — الصورة تملأ الهاتف + الحلقات تظهر + رجوع لنفس المكان
+
+          | النقطة | سبب المشكل | الحل |
+          |---|---|---|
+          | **الصورة لا تملأ الهاتف** | كان التصحيح التلقائي يفرض إطار 16:9 ثابتًا فيظهر الفيديو في الوسط بأشرطة سوداء على الجانبين | حُذف التصحيح التلقائي، والمشغل الكبير صار افتراضيًا **تكبير يملأ الشاشة** بلا تشويه (ضغطة مطوّلة على «توسيع» تبدّل: ملاءمة / تكبير / تمديد / 16:9 / 4:3) |
+          | **«لا توجد حلقات» عند ضغط موسم** | بعض البوابات ترقّم المواسم بمعرّفها (501 …) بلا season_id ولا season_number، والنسخة السابقة كانت تحوّل المفتاح إلى رقم الاسم فلا يطابق شيئًا | المفتاح صار **كما يعرفه السرفر** + مطابقة إضافية بالاسم والرقم + احتياطي يعرض حلقات الرد إن كان فيه مجموعة مواسم واحدة |
+          | **الرجوع لا يرجع للفلم/المسلسل** | حالة القسم (المواسم/الحلقات + الموضع) كانت تُفقد عند العودة | تُحفظ الحالة قبل فتح المشغل وتُستعاد عند الرجوع: نفس القسم، نفس المستوى، نفس العنصر معلَّمًا ▶ ونفس موضع التمرير — تصمد حتى لو أُعيد إنشاء الشاشة |
+          | **ترتيب ودقة المواسم** | رقم الموسم كان يُقرأ من المفتاح لا من الاسم | الترقيم والعرض من اسم الموسم («موسم 3») والترتيب رقمي، والحلقات بلا تكرار ومرتبة |
+          | **فحص قبل الإرسال** | — | تصريف Sources/Core/Grid/Live + 53 اختبار بوابة ⇒ **0 خطأ / 53 ناجح** |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -1708,6 +1718,7 @@ jobs:
               private var lastPlayedUrl = ""
               private var lastName = ""
               private var pendingScroll = false
+              private var curSeriesMid = ""          // المسلسل المفتوح حاليًا (مواسم/حلقات)
               private var evRec: android.content.BroadcastReceiver? = null
               private val saved = ArrayList<Channel>()
               private val favs = ArrayList<Channel>()
@@ -1879,6 +1890,7 @@ jobs:
                                   if (saved.isEmpty()) { saved.addAll(all) }
                                   all.clear(); all.addAll(out)
                                   inEpisodes = true; seriesName = c.name + " • " + c.group
+                                  curSeriesMid = c.mid
                                   applyFilter(); rvGrid.scrollToPosition(0)
                               } catch (t: Throwable) {
                                   try { showBusy(false, "") } catch (e: Throwable) {}
@@ -1905,6 +1917,7 @@ jobs:
                                               if (saved.isEmpty()) saved.addAll(all)
                                               all.clear(); all.addAll(out2)
                                               inEpisodes = true; seriesName = c.name
+                                              curSeriesMid = c.mid
                                               applyFilter(); rvGrid.scrollToPosition(0)
                                               toast("حُمّلت $n2 حلقة (مسار احتياطي)")
                                           } else {
@@ -1917,6 +1930,7 @@ jobs:
                                   if (saved.isEmpty()) { saved.addAll(all) }
                                   all.clear(); all.addAll(out)
                                   inEpisodes = true; seriesName = c.name
+                                  curSeriesMid = c.mid
                                   if (out.any { it.kind == "season" }) {
                                       // مواسم فقط: المستخدم يضغط الموسم ليُحمَّل
                                       seriesName = c.name
@@ -1944,6 +1958,7 @@ jobs:
                               if (saved.isEmpty()) { saved.addAll(all) }
                               all.clear(); all.addAll(out)
                               inEpisodes = true; seriesName = c.name
+                              curSeriesMid = c.id
                               applyFilter(); rvGrid.scrollToPosition(0)
                           } catch (t: Throwable) {
                               try { showBusy(false, "") } catch (e: Throwable) {}
@@ -1997,8 +2012,72 @@ jobs:
                   lastPlayedUrl = if (c.url.isNotBlank()) c.url else c.alt
                   lastName = c.name
                   pendingScroll = true
+                  saveReturn(c)
                   i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                   try { startActivity(i) } catch (t: Throwable) { toast("تعذّر فتح المشغّل: " + (t.message ?: "")) }
+              }
+
+              /** يحفظ «مكان الرجوع»: القسم + المستوى + العنصر + موضع التمرير (قبل فتح المشغل). */
+              private fun saveReturn(c: Channel) {
+                  try {
+                      sp.put("ret_kind", kind)
+                      sp.put("ret_level", if (inEpisodes) "1" else "0")
+                      sp.put("ret_series", seriesName)
+                      sp.put("ret_mid", curSeriesMid)
+                      sp.put("ret_cat", selCat?.name ?: "")
+                      sp.put("ret_played_url", lastPlayedUrl)
+                      sp.put("ret_played_id", lastPlayedId)
+                      sp.put("ret_played_name", lastName)
+                      sp.put("ret_idx", items.indexOfFirst { sameItem(it, c) }.toString())
+                      sp.put("ret_scroll", firstVisible().toString())
+                      sp.put("ret_items", if (inEpisodes) encodeChans(items) else "")
+                      sp.put("ret_pending", "1")
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              private fun firstVisible(): Int = try {
+                  (rvGrid.layoutManager as? LinearLayoutManager)?.findFirstVisibleItemPosition() ?: 0
+              } catch (t: Throwable) { 0 }
+
+              /** يستعيد «مكان الرجوع» — نفس القسم ونفس العنصر (يشتغل حتى بعد إعادة إنشاء الشاشة). */
+              private fun restoreReturn() {
+                  val k = sp.s("ret_kind").ifBlank { kind }
+                  kind = k
+                  macLocal = Catalog.loaded && Catalog.profile?.type == "mac"
+                  lastName = sp.s("ret_played_name")
+                  lastPlayedId = sp.s("ret_played_id")
+                  lastPlayedUrl = sp.s("ret_played_url")
+                  val idx = sp.s("ret_idx").toIntOrNull() ?: -1
+                  if (sp.s("ret_level") == "1") {
+                      val items0 = ArrayList<Channel>()
+                      decodeChans(sp.s("ret_items"), items0)
+                      if (items0.isNotEmpty()) {                 // نفس قائمة المواسم/الحلقات التي كان فيها
+                          inEpisodes = true
+                          seriesName = sp.s("ret_series")
+                          curSeriesMid = sp.s("ret_mid")
+                          all.clear()
+                          all.addAll(items0)
+                          cats.clear()
+                          cats.add(Group().apply { name = "ALL"; special = "all"; count = all.size })
+                          title.text = seriesName
+                          applyFilter()
+                          rvCats.adapter = CatAdapter()
+                          rvGrid.scrollToPosition(if (idx in items.indices) idx else 0)
+                          adapter.notifyDataSetChanged()
+                          return
+                      }
+                  }
+                  inEpisodes = false
+                  seriesName = ""
+                  build()                                        // قائمة الأفلام/المسلسلات من الكتالوج
+                  val catName = sp.s("ret_cat")
+                  if (catName.isNotBlank()) {
+                      val g = cats.firstOrNull { it.name == catName }
+                      if (g != null) { selCat = g; applyFilter() }
+                  }
+                  val pos = if (idx in items.indices) idx else (sp.s("ret_scroll").toIntOrNull() ?: 0)
+                  try { rvGrid.scrollToPosition(pos.coerceAtLeast(0)) } catch (t: Throwable) {}
+                  adapter.notifyDataSetChanged()
               }
 
               private fun sameItem(a: Channel, b: Channel): Boolean {
@@ -2035,9 +2114,12 @@ jobs:
               override fun onResume() {
                   super.onResume()
                   goImmersive()
-                  if (pendingScroll) {                    // رجعنا من المشغل: نفس القسم ونفس العنصر
-                      pendingScroll = false
-                      try { rvGrid.post { scrollToLast() } } catch (t: Throwable) { Crash.log(t) }
+                  if (sp.s("ret_pending") == "1") {        // رجعنا من المشغل: نفس القسم ونفس العنصر
+                      sp.put("ret_pending", "0")
+                      if (pendingScroll) {
+                          pendingScroll = false
+                          try { restoreReturn() } catch (t: Throwable) { Crash.log(t); try { rvGrid.post { scrollToLast() } } catch (e: Throwable) {} }
+                      }
                   }
                   evRec = Events.register(this) { type, _ ->
                       if (type == "catalog") runOnUiThread {
@@ -2298,6 +2380,13 @@ jobs:
                   setContentView(R.layout.activity_live)
                   goImmersive()
                   bind()                                     // ← أولًا: هنا تُعيَّن pv/pvFull وباقي العناصر
+                  // نسبة الصورة: «تكبير يملأ الشاشة» افتراضيًا (يملأ الهاتف بلا شدّ). ترقية مرة واحدة من 8.17
+                  // (النسخة السابقة كانت تحفظ 16:9 الثابتة تلقائيًا ⇒ أشرطة سوداء على الجانبين)
+                  if (sp.s("rm3", "") != "1") {
+                      val oldMode = sp.s("rm2", "")
+                      if (oldMode.isBlank() || oldMode == "0" || oldMode == "3") sp.put("rm2", "1")
+                      sp.put("rm3", "1")
+                  }
                   pv.controllerAutoShow = !tv                // (كان قبل bind() → استثناء يفتح شاشة المشغل = طيّاح التطبيق)
                   pv.controllerShowTimeoutMs = if (tv) 2600 else 4200
                   buildPlayer()
@@ -2632,11 +2721,11 @@ jobs:
               }
 
               /**
-               * نسبة الصورة (v8.16): 0 ملاءمة مضبوطة (افتراضي — لا شدّ ولا قصّ)، 1 تكبير يملأ الشاشة،
-               * 2 تمديد، 3 نسبة 16:9 ثابتة، 4 نسبة 4:3 ثابتة (تُصلح بيانات السرفر المقلوبة).
+               * نسبة الصورة (v8.18): 1 تكبير يملأ الشاشة (افتراضي — يملأ الهاتف بلا شدّ، قصّ خفيف فقط)،
+               * 0 ملاءمة مضبوطة (الصورة كاملة بأشرطة)، 2 تمديد، 3 نسبة 16:9 ثابتة، 4 نسبة 4:3 ثابتة.
                */
               private fun applyResize() {
-                  val mode = sp.s("rm2", "0")
+                  val mode = sp.s("rm2", "1")
                   val rm = when (mode) {
                       "1" -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                       "2" -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
@@ -2652,6 +2741,14 @@ jobs:
                   try { v.resizeMode = rm } catch (t: Throwable) {}
                   val parent = v.parent as? View ?: return
                   val lp = v.layoutParams as? FrameLayout.LayoutParams ?: return
+                  if (ratio <= 0f) {                       // «يملأ الشاشة»: الصندوق كامل (لا يبقى محبوسًا على 16:9)
+                      try {
+                          lp.width = FrameLayout.LayoutParams.MATCH_PARENT
+                          lp.height = FrameLayout.LayoutParams.MATCH_PARENT
+                          v.layoutParams = lp
+                      } catch (t: Throwable) {}
+                      return
+                  }
                   if (ratio > 0f) {
                       var pw = parent.width
                       var ph = parent.height
@@ -2675,8 +2772,8 @@ jobs:
               }
 
               private fun cycleResize() {
-                  val order = listOf("0", "1", "3", "2", "4")
-                  val i = order.indexOf(sp.s("rm2", "0")).let { if (it < 0) 0 else it }
+                  val order = listOf("1", "0", "2", "3", "4")
+                  val i = order.indexOf(sp.s("rm2", "1")).let { if (it < 0) 0 else it }
                   val nxt = order[(i + 1) % order.size]
                   sp.put("rm2", nxt)
                   applyResize()
@@ -2786,9 +2883,9 @@ jobs:
               private fun ratioLabel(m: String): String = when (m) {
                   "1" -> "تكبير يملأ الشاشة"
                   "2" -> "تمديد"
-                  "3" -> "16:9 ثابتة (لبيانات مقلوبة)"
+                  "3" -> "16:9 ثابتة"
                   "4" -> "4:3 ثابتة"
-                  else -> "ملاءمة مضبوطة"
+                  else -> "ملاءمة مضبوطة (أشرطة)"
               }
 
               /* ================================ SmartLoad ================================ */
@@ -2842,22 +2939,13 @@ jobs:
               }
 
               override fun onVideoSizeChanged(size: VideoSize) {
-                  var w = size.width
-                  var h = size.height
-                  val rot = size.unappliedRotationDegrees
-                  if (rot == 90 || rot == 270) { val t = w; w = h; h = t }
-                  lastW = w; lastH = h
+                  val w = size.width
+                  val h = size.height
+                  lastW = w
+                  lastH = h
                   fullQual.text = if (w > 0 && h > 0) "$w×$h" else ""
-                  // تصحيح تلقائي: السرفر يرسل الأبعاد مقلوبة (عمودي) والصورة أفقية ⇒ الصورة تبدو مشدودة
-                  try {
-                      val land = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                      val fix = Stalker.autoAspect(w, h, land)
-                      if (fix != null && sp.s("rm2", "0") == "0") {
-                          sp.put("rm2", fix)
-                          applyResize()
-                          toast("نسبة الصورة من السرفر غير مضبوطة — صُحّحت تلقائيًا (16:9). ضغطة مطوّلة على «توسيع» لتغييرها")
-                      }
-                  } catch (t: Throwable) { Crash.log(t) }
+                  // لا نبدّل نسبة الصورة تلقائيًا: الأبعاد المقلوبة من السرفر لا تُغيّر الصورة المعروضة،
+                  // والتبديل التلقائي كان يضعها في إطار 16:9 بأشرطة سوداء (شكوى 8.17). التبديل يدوي بضغطة مطوّلة.
               }
 
               override fun onPlayerError(e: PlaybackException) {
@@ -3254,7 +3342,7 @@ jobs:
                       "تغيير رمز القفل",
                       "مسح السجل",
                       "عمق الجلب (أفلام/مسلسلات): " + depthLabel(),
-                      "نسبة الصورة: " + ratioLabel(sp.s("rm2", "0"))
+                      "نسبة الصورة: " + ratioLabel(sp.s("rm2", "1"))
                   )
                   pickDialog("الإعدادات السريعة", items) { i ->
                       when (i) {
@@ -4445,13 +4533,6 @@ jobs:
                       return m.groupValues[1] + path
                   }
 
-                  /**
-                   * تصحيح تلقائي لنسبة الصورة: بعض البوابات ترسل أبعاد الفيديو مقلوبة (عمودي 1080×1920)
-                   * والصورة الحقيقية أفقية، فتظهر مشدودة على الهاتف. نرجع "3" (نسبة 16:9 ثابتة) وإلا null.
-                   */
-                  fun autoAspect(w: Int, h: Int, landscape: Boolean): String? =
-                      if (landscape && w > 0 && h > w) "3" else null
-
                   /** أمر محلي قياسي عندما لا ترسل البوابة cmd: http://localhost/ch/<id>_ (نفس ما يبنيه MAG) */
                   fun localCmd(id: String): String {
                       val n = id.substringBefore(":").replace(Regex("\\D"), "")
@@ -4987,7 +5068,7 @@ jobs:
                           else -> name
                       }
                       val sName0 = name.ifBlank { "موسم " + seasonNumber.ifBlank { rawKey } }
-                      val sKey = normSeasonKey(rawKey, sName0, seasonNumber)
+                      val sKey = rawSeasonKey(explicitSeasonId, id, seasonNumber, sName0)
                       when {
                           nested != null && nested.length() > 0 -> {
                               addSeasonFolder(out, seriesId, if (genre.isBlank()) "مسلسلات" else genre, cover, sKey,
@@ -5000,7 +5081,7 @@ jobs:
                               created++
                           }
                           cmd.isNotBlank() -> {
-                              out.add(episodeChannel(item, seriesId, normSeasonKey(if (explicitSeasonId.isNotBlank()) explicitSeasonId else seasonNumber, name, seasonNumber), "", genre, cover, out.size))
+                              out.add(episodeChannel(item, seriesId, rawSeasonKey(explicitSeasonId, id, seasonNumber, name), "", genre, cover, out.size))
                               created++
                           }
                       }
@@ -5036,32 +5117,48 @@ jobs:
                   return false
               }
 
-              /**
-               * مفتاح موسم موحّد (رقم الموسم). الغاية: لو رجعت نفس المواسم بأشكال مختلفة
-               * (`id=1` و `season_id=1` و «Season 1») تُصبح بطاقة واحدة لا ثلاث بطاقات مكرّرة.
-               */
-              private fun normSeasonKey(raw: String, name: String, seasonNumber: String = ""): String {
-                  val m = Regex("(?i)(?:موسم|season)\\s*0*(\\d{1,4})").find(name)
-                  if (m != null) return m.groupValues[1]
-                  val sn = seasonNumber.trim()
-                  if (sn.toIntOrNull() != null) return sn
-                  var r = raw.trim().replace("series_", "")
-                  if (r.contains(":")) {
-                      val t = r.substringAfterLast(':').trim()
+              /** رقم الموسم من أي شكل: «3» أو «series:3» أو «موسم 3» أو «Season 3». "" لو ما لقاش. */
+              private fun seasonNum(key: String, name: String = ""): String {
+                  val k = key.trim().replace("series_", "")
+                  if (k.contains(":")) {
+                      val t = k.substringAfterLast(':').trim()
                       if (t.toIntOrNull() != null) return t
                   }
-                  if (r.isBlank()) {
-                      val m2 = Regex("(?i)s(\\d{1,3})\\b").find(name)
-                      if (m2 != null) return m2.groupValues[1]
-                  }
-                  return r
+                  if (k.toIntOrNull() != null) return k
+                  val m = Regex("(?i)(?:موسم|season)\\s*0*(\\d{1,4})").find(name)
+                  if (m != null) return m.groupValues[1]
+                  val m2 = Regex("(?i)s(\\d{1,3})\\b").find(name)
+                  if (m2 != null) return m2.groupValues[1]
+                  return ""
+              }
+
+              /** رقم الموسم للعرض والترتيب: من الاسم أولًا («موسم 3»)، ثم من season_number، ثم من المفتاح الصغير. */
+              private fun displayNum(key: String, name: String, seasonNumber: String = ""): Int {
+                  val m = Regex("(?i)(?:موسم|season)\\s*0*(\\d{1,4})").find(name)
+                  if (m != null) return m.groupValues[1].toIntOrNull() ?: 0
+                  val m2 = Regex("(?i)(?:^|\\W)s(\\d{1,3})(?:\\W|$)").find(name)
+                  if (m2 != null) return m2.groupValues[1].toIntOrNull() ?: 0
+                  val sn = seasonNumber.trim().toIntOrNull()
+                  if (sn != null && sn in 1..99) return sn
+                  val kn = seasonNum(key, "").toIntOrNull()
+                  return if (kn != null && kn in 1..99) kn else 0
+              }
+
+              /**
+               * مفتاح الموسم **كما يعرفه السرفر**: نستعمله في الرابط وفي المطابقة.
+               * (في 8.16 صار المفتاح رقم الاسم ⇒ البوابات التي تطلب `season_id=<id الحقيقي>` ما رجّعتش حلقات).
+               */
+              private fun rawSeasonKey(seasonId: String, id: String, seasonNumber: String, name: String): String {
+                  for (v in listOf(seasonId.trim(), id.trim(), seasonNumber.trim())) if (v.isNotBlank() && v != "0") return v
+                  return name.trim()
               }
 
               /** اسم بطاقة الموسم + عدد حلقاته الحقيقي. */
-              private fun seasonTitle(seasonName: String, key: String, cnt: Int): String {
+              private fun seasonTitle(seasonName: String, num: Int, key: String, cnt: Int): String {
+                  val lbl = if (num > 0) num.toString() else key
                   var base = seasonName.trim()
-                  if (base.isEmpty() || base.toIntOrNull() != null) base = "موسم " + key
-                  else if (!base.contains("موسم") && !base.lowercase().contains("season")) base = "موسم " + key
+                  if (base.isEmpty() || base.toIntOrNull() != null) base = "موسم $lbl"
+                  else if (!base.contains("موسم") && !base.lowercase().contains("season")) base = "موسم $lbl"
                   return if (cnt > 0) "$base • $cnt حلقة" else base
               }
 
@@ -5081,7 +5178,7 @@ jobs:
               private fun sortTree(out: MutableList<Channel>) {
                   if (out.none { it.stype == "season" }) return
                   val sorted = out.sortedWith(compareBy(
-                      { it.sid.toIntOrNull() ?: 99999 },
+                      { if (it.stype == "season" && it.num > 0) it.num else it.sid.toIntOrNull() ?: 99999 },
                       { it.name }))
                   out.clear()
                   out.addAll(sorted)
@@ -5091,7 +5188,8 @@ jobs:
               private fun addSeasonFolder(out: MutableList<Channel>, seriesId: String, genre: String, cover: String,
                                           seasonKey: String, seasonName: String, seasonNumber: String, eps: JSONArray?) {
                   val g = if (genre.isBlank()) "مسلسلات" else genre
-                  val key = normSeasonKey(seasonKey, seasonName, seasonNumber)
+                  val key = seasonKey.ifBlank { seasonName.trim() }
+                  val num = displayNum(key, seasonName, seasonNumber)
                   val ck = seriesId + "|" + key
                   if (eps != null && eps.length() > 0) {
                       val list = ArrayList<Channel>()
@@ -5106,19 +5204,23 @@ jobs:
                       }
                   }
                   val cnt = synchronized(seasonCache) { seasonCache[ck]?.size ?: 0 }
-                  val exist = out.firstOrNull { it.stype == "season" && it.mid == seriesId && it.sid == key }
+                  val exist = out.firstOrNull {
+                      it.stype == "season" && it.mid == seriesId && (it.sid == key || (num > 0 && it.num == num))
+                  }
                   if (exist != null) {                       // موسم مكرّر: نحدّث الاسم/العدد ولا نضيف بطاقة ثانية
-                      exist.name = seasonTitle(seasonName, key, cnt)
+                      exist.name = seasonTitle(seasonName, num, key, cnt)
+                      if (exist.num <= 0) exist.num = num
                       return
                   }
                   out.add(Channel().apply {
                       kind = "season"; stype = "season"
-                      name = seasonTitle(seasonName, key, cnt)
+                      this.num = num
+                      name = seasonTitle(seasonName, num, key, cnt)
                       group = g
                       id = "season_" + seriesId + "_" + key
                       mid = seriesId; sid = key
                       logo = cover; catId = seriesId
-                      extra = seasonName.ifBlank { "موسم $key" }
+                      extra = seasonName.ifBlank { "موسم " + (if (num > 0) num.toString() else key) }
                   })
               }
 
@@ -5132,17 +5234,20 @@ jobs:
               fun seasonEpisodes(seriesId0: String, seasonId: String, out: MutableList<Channel>): Int {
                   val seriesId = seriesId0.replace("series_", "").trim()
                   if (seriesId.isBlank()) return 0
-                  val key = normSeasonKey(seasonId, "", "")
+                  val raw = seasonId.trim()
+                  val key = raw.ifBlank { seasonNum(raw, "") }
                   // (0) حلقات مدمجة محفوظة من الشجرة (بلا شبكة) — نفس `getEpisodesForParent` في كود Java
                   synchronized(seasonCache) {
-                      val hit = seasonCache[seriesId + "|" + key] ?: seasonCache[seriesId + "|" + seasonId.trim()]
+                      val hit = seasonCache[seriesId + "|" + key] ?: seasonCache[seriesId + "|" + raw]
+                          ?: seasonNum(raw, "").takeIf { it.isNotBlank() }?.let { seasonCache[seriesId + "|" + it] }
                       if (hit != null && hit.isNotEmpty()) { out.addAll(hit); return hit.size }
                   }
                   val enc = Uri.encode(seriesId)
                   val urls = ArrayList<String>()
                   urls.add("type=series&action=get_ordered_list&movie_id=$enc&p=1")
                   if (!seriesId.contains(":")) urls.add("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$seriesId") + "&p=1")
-                  if (key.isNotBlank()) urls.add("type=series&action=get_ordered_list&movie_id=$enc&season_id=" + Uri.encode(key) + "&p=1")
+                  for (k in listOf(key, seasonNum(raw, "")).filter { it.isNotBlank() }.distinct())
+                      urls.add("type=series&action=get_ordered_list&movie_id=$enc&season_id=" + Uri.encode(k) + "&p=1")
                   urls.add("type=series&action=get_series_info&movie_id=$enc")
                   for (u in urls) {
                       val r = req(u) ?: continue
@@ -5150,13 +5255,11 @@ jobs:
                       val n = parseSeasonEpisodes(r, seriesId, key, tmp)
                       if (n > 0) return finishEps(seriesId, key, tmp, out)
                   }
-                  // آخر حل: نفس صيغة النجاة (movie_id = series:season)
-                  if (key.isNotBlank()) {
-                      val r = req("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$key") + "&p=1")
-                      if (r != null) {
-                          val tmp = ArrayList<Channel>()
-                          if (parseSeasonEpisodes(r, seriesId, key, tmp) > 0) return finishEps(seriesId, key, tmp, out)
-                      }
+                  // صيغ النجاة: movie_id = series:season (بالمفتاح أو برقم الموسم)
+                  for (k in listOf(key, seasonNum(raw, "")).filter { it.isNotBlank() }.distinct()) {
+                      val r = req("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$k") + "&p=1") ?: continue
+                      val tmp = ArrayList<Channel>()
+                      if (parseSeasonEpisodes(r, seriesId, k, tmp) > 0) return finishEps(seriesId, k, tmp, out)
                   }
                   return 0
               }
@@ -5182,13 +5285,13 @@ jobs:
                       val keys = ArrayList<String>()
                       val it = mapObj.keys(); while (it.hasNext()) keys.add(it.next())
                       for (k in keys) {
-                          if (!isSameSeason(seasonId, k, k, k)) continue
                           val sd = mapObj.optJSONObject(k) ?: continue
+                          if (!isSameSeason(seasonId, k, k, k, str(sd, "name", "title"))) continue
                           val eps = sd.optJSONArray("series") ?: sd.optJSONArray("episodes") ?: continue
                           val sName = str(sd, "name", "title").ifBlank { "موسم $k" }
                           for (i in 0 until eps.length()) {
                               val e = eps.optJSONObject(i) ?: continue
-                              val c = episodeChannel(e, seriesId, if (isSameSeason(seasonId, k, k, k)) k else seasonId, sName, "", "", out.size)
+                              val c = episodeChannel(e, seriesId, k, sName, "", "", out.size)
                               if (out.none { it.id == c.id }) out.add(c)
                           }
                       }
@@ -5203,7 +5306,7 @@ jobs:
                       val returnedSeasonId = str(season, "season_id").trim()
                       val returnedSeasonNumber = str(season, "season_number").trim()
                       val nested = season.optJSONArray("series") ?: season.optJSONArray("episodes")
-                      val same = isSameSeason(seasonId, returnedId, returnedSeasonId, returnedSeasonNumber)
+                      val same = isSameSeason(seasonId, returnedId, returnedSeasonId, returnedSeasonNumber, str(season, "name", "title"))
                       if (!same) continue
                       if (nested == null || nested.length() == 0) continue
                       val sId = if (returnedId.isNotBlank()) returnedId else seasonId
@@ -5214,6 +5317,28 @@ jobs:
                           if (out.none { it.id == c.id }) { out.add(c); added++ }
                       }
                   }
+                  // (احتياطي 8.18) لا شيء طابق الموسم المطلوب؟ إن كان في الرد **مجموعة مواسم واحدة** نعرضها
+                  // بدل «لا توجد حلقات» (وإن كان فيه عدة مواسم فلا نخلطها — الأدق أن نقول لا توجد)
+                  if (added == 0) {
+                      var groups = 0
+                      var solo: JSONArray? = null
+                      for (i in 0 until arr.length()) {
+                          val season = arr.optJSONObject(i) ?: continue
+                          val nested = season.optJSONArray("series") ?: season.optJSONArray("episodes") ?: continue
+                          if (nested.length() == 0) continue
+                          groups++
+                          solo = nested
+                      }
+                      if (groups == 1 && solo != null) {
+                          val sn = solo
+                          for (e in 0 until sn.length()) {
+                              val ep = sn.optJSONObject(e) ?: continue
+                              val c = episodeChannel(ep, seriesId, seasonId, "", "", "", out.size)
+                              if (out.none { it.id == c.id && it.name == c.name }) { out.add(c); added++ }
+                          }
+                      }
+                  }
+
                   // لو ما كانش تصنيف مواسم في الرد: العناصر نفسها حلقات (بوابات مسطّحة)
                   if (added == 0 && arr.length() > 0) {
                       var flat = 0
@@ -5233,7 +5358,8 @@ jobs:
               }
 
               /** مطابقة الموسم المطلوب مع ما رجعه السرفر — نفس `isSameMacPortalSeason` بالحرف. */
-              fun isSameSeason(wantedSeasonId: String, returnedId: String, returnedSeasonId: String, returnedSeasonNumber: String): Boolean {
+              fun isSameSeason(wantedSeasonId: String, returnedId: String, returnedSeasonId: String,
+                               returnedSeasonNumber: String, returnedName: String = ""): Boolean {
                   if (wantedSeasonId.trim().isEmpty()) return true
                   val wanted = wantedSeasonId.trim()
                   if (wanted == returnedId) return true
@@ -5252,6 +5378,18 @@ jobs:
                   if (returnedSeasonId.contains(":")) {
                       val rNum = returnedSeasonId.substring(returnedSeasonId.lastIndexOf(":") + 1)
                       if (wanted == rNum) return true
+                  }
+                  // مقارنة بالرقم: «2» = `season_number=2` = `id=301:2` (والبوابات تخلط بينها كثيرًا)
+                  val wNum = seasonNum(wanted, "")
+                  if (wNum.isNotBlank()) {
+                      if (wNum == seasonNum(returnedId, "")) return true
+                      if (wNum == seasonNum(returnedSeasonId, "")) return true
+                      if (wNum == seasonNum(returnedSeasonNumber, "") && returnedSeasonNumber.trim().isNotBlank()) return true
+                  }
+                  if (returnedName.isNotBlank()) {          // «موسم 1» في الرد يطابق المطلوب «1»
+                      val rNum = displayNum("", returnedName, returnedSeasonNumber)
+                      val w = seasonNum(wanted, "").toIntOrNull()
+                      if (rNum > 0 && w != null && w == rNum) return true
                   }
                   return false
               }
@@ -7086,7 +7224,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.17 (code 817)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.18 (code 818)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
