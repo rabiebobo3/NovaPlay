@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.19"
-      VERSION_CODE: "819"
+      VERSION_NAME: "8.20"
+      VERSION_CODE: "820"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 819)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.19")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 820)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.20")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -355,6 +355,16 @@ jobs:
           | **دعم حلقات كنصوص** | بعض البوابات ترسل `series: ["101","102"]` (نصوص لا كائنات) — صار تُقرأ مثل Java |
           | **الصورة تلقائيًا** | الوضع الافتراضي **تلقائي: يملأ شاشة الهاتف** بلا شدّ، ويُعاد تطبيقه مع كل فيديو حسب أبعاد شاشة هاتفك؛ ضغطة مطوّلة على «توسيع» تبدّل يدويًا |
           | **إذا بقيت مشكلة** | يُكتب تشخيص في **سجل الأعطال** (الإعدادات): آخر طلب أُرسل ورد البوابة — أرسله ليّ ونعرف السبب بالضبط |
+
+          ## 8.20 — تشغيل الحلقة (مثل دالة Java) + رجوع هرمي بالفوكس
+
+          | النقطة | ما تم |
+          |---|---|
+          | **الحلقة ما كانتش تشتغل** | `loadAndPlayEpisode` في كودك تبني أمر base64 فيه `season_num` = **رقم الموسم** (1، 2، 3). أنا كنت نرسل معرّف السرفر (501) والبوابة ترفضه ⇒ لا رابط. دابا: رقم الموسم المعلوم أولًا، ثم مفتاح السرفر، ثم رقم الحلقة وحده — نفس ترتيب دالتك، مع `type=vod` و`type=series` |
+          | **رجوع هرمي بالفوكس** | حلقة → **الفوكس على الموسم** • موسم → **الفوكس على المسلسل** • فلم → **الفوكس على الفلم**. المستويات الثلاثة محفوظة (قائمة/مواسم/حلقات) فيرجع لنفس المكان حتى بعد إعادة إنشاء الشاشة |
+          | **الصورة تلقائيًا** | الوضع يُختار من **أبعاد الفيديو نفسه** مع أبعاد شاشة هاتفك: فيديو 16:9 أو أعرض ⇒ يملأ الشاشة بلا أشرطة (قصّ خفيف في الجوانب)، وفيديو أضيق (4:3/عمودي) ⇒ ملاءمة كاملة بلا تكبير عنيف. يتغيّر مع كل حلقة/فلم لوحده |
+          | **تشخيص** | إذا فشل رابط: يُكتب في **سجل الأعطال**: `[PLAY-FAIL] kind=… mid=… sid=… snum=… :: <آخر الطلبات>` |
+          | **الفحص** | تصريف كامل 0 خطأ / 92 صنف • اختبارات: **56 ناجح / 0 فاشل** (منها: بوابة تقبل `season_num=1` فقط وترفض 501 ⇒ التشغيل ينجح) |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -1338,13 +1348,14 @@ jobs:
               var extra = ""             // وصف / ملاحظات
               var mid = ""               // series_id في بوابات MAC
               var sid = ""               // season_id في بوابات MAC
+              var snum = 0               // رقم الموسم (1،2،3) كما يعرفه السرفر في season_num
               var stype = ""             // نوع العقدة: series | season | episode | movie
 
               fun toJson(): JSONObject = JSONObject().apply {
                   put("num", num); put("name", name); put("url", url); put("group", group)
                   put("kind", kind); put("id", id); put("catId", catId); put("logo", logo)
                   put("epgId", epgId); put("alt", alt); put("extra", extra)
-                  put("mid", mid); put("sid", sid); put("stype", stype)
+                  put("mid", mid); put("sid", sid); put("stype", stype); put("snum", snum)
               }
 
               companion object {
@@ -1354,6 +1365,7 @@ jobs:
                       id = o.optString("id"); catId = o.optString("catId"); logo = o.optString("logo")
                       epgId = o.optString("epgId"); alt = o.optString("alt"); extra = o.optString("extra")
                       mid = o.optString("mid"); sid = o.optString("sid"); stype = o.optString("stype")
+                      snum = o.optInt("snum")
                   }
               }
           }
@@ -1739,6 +1751,14 @@ jobs:
               private var lastName = ""
               private var pendingScroll = false
               private var curSeriesMid = ""          // المسلسل المفتوح حاليًا (مواسم/حلقات)
+
+              /* v8.20: مستويات التنقّل — 0 قائمة، 1 مواسم، 2 حلقات (رجوع هرمي مع الفوكس) */
+              private var lvl = 0
+              private var sectionTitle = ""
+              private val seasonsList = ArrayList<Channel>()   // عناصر مستوى المواسم
+              private val epsList = ArrayList<Channel>()       // عناصر مستوى الحلقات
+              private var seriesCh: Channel? = null            // المسلسل الذي فتحناه (للفوكس عند الرجوع)
+              private var seasonCh: Channel? = null            // الموسم الذي فتحناه (للفوكس عند الرجوع)
               private var evRec: android.content.BroadcastReceiver? = null
               private val saved = ArrayList<Channel>()
               private val favs = ArrayList<Channel>()
@@ -1898,9 +1918,12 @@ jobs:
 
               private fun open(c: Channel) {
                   val p = Catalog.profile
+                  if (lvl == 0 && sectionTitle.isBlank()) sectionTitle = title.text.toString()
                   if (kind == "series" && p?.type == "mac") {
                       if (c.kind == "episode") { playNow(c); return }
                       if (c.kind == "season" && c.mid.isNotBlank()) {
+                          seasonCh = c
+                          if (lvl == 0) { seriesCh = c; if (sectionTitle.isBlank()) sectionTitle = title.text.toString() }
                           showBusy(true, "تحميل حلقات الموسم…")
                           val out = ArrayList<Channel>()
                           Loader.macSeason(p, c.mid, c.sid, out) { n ->
@@ -1913,10 +1936,14 @@ jobs:
                                       toast("البوابة ما رجعتش حلقات — راجع «سجل الأعطال» من الإعدادات")
                                       return@macSeason
                                   }
-                                  if (saved.isEmpty()) { saved.addAll(all) }
+                                  if (saved.isEmpty() && all.none { it.stype == "season" }) { saved.addAll(all) }
+                                  seasonsList.clear(); seasonsList.addAll(all)      // المستوى الحالي = مواسم
                                   all.clear(); all.addAll(out)
+                                  epsList.clear(); epsList.addAll(out)
+                                  lvl = 2
                                   inEpisodes = true; seriesName = c.name + " • " + c.group
                                   curSeriesMid = c.mid
+                                  markOn(null)
                                   applyFilter(); rvGrid.scrollToPosition(0)
                                   toast("حُمّلت ${out.size} حلقة")
                               } catch (t: Throwable) {
@@ -1929,6 +1956,7 @@ jobs:
                       }
                       if (c.id.isNotBlank() || c.mid.isNotBlank()) {
                           if (c.mid.isBlank()) c.mid = c.id          // بعض البوابات ترسل series_id في id فقط
+                          if (lvl == 0) { seriesCh = c; if (sectionTitle.isBlank()) sectionTitle = title.text.toString() }
                           showBusy(true, "تحميل الحلقات…")
                           val out = ArrayList<Channel>()
                           Loader.macSeries(p, c.mid, c.name, c.group, c.logo, out) { n ->
@@ -1941,7 +1969,7 @@ jobs:
                                       Loader.macSeason(p, c.mid, "1", out2) { n2 ->
                                           showBusy(false, "")
                                           if (n2 > 0) {
-                                              if (saved.isEmpty()) saved.addAll(all)
+                                              if (saved.isEmpty() && all.none { it.stype == "season" }) saved.addAll(all)
                                               all.clear(); all.addAll(out2)
                                               inEpisodes = true; seriesName = c.name
                                               curSeriesMid = c.mid
@@ -1954,10 +1982,13 @@ jobs:
                                       }
                                       return@macSeries
                                   }
-                                  if (saved.isEmpty()) { saved.addAll(all) }
+                                  if (saved.isEmpty() && all.none { it.stype == "season" }) { saved.addAll(all) }
                                   all.clear(); all.addAll(out)
+                                  seasonsList.clear(); seasonsList.addAll(out)     // مستوى المواسم (للرجوع الهرمي)
+                                  lvl = 1
                                   inEpisodes = true; seriesName = c.name
                                   curSeriesMid = c.mid
+                                  title.text = c.name
                                   if (out.any { it.kind == "season" }) {
                                       // مواسم فقط: نبدأ فورًا (في الخلفية) جلب حلقات كل موسم مثل كود Java
                                       seriesName = c.name
@@ -1986,7 +2017,7 @@ jobs:
                           try {
                               showBusy(false, "")
                               if (n == 0) { toast("لا توجد حلقات — سيتم تشغيل الرابط المباشر"); playNow(c); return@xtreamEpisodes }
-                              if (saved.isEmpty()) { saved.addAll(all) }
+                              if (saved.isEmpty() && all.none { it.stype == "season" }) { saved.addAll(all) }
                               all.clear(); all.addAll(out)
                               inEpisodes = true; seriesName = c.name
                               curSeriesMid = c.id
@@ -2049,28 +2080,61 @@ jobs:
               }
 
               /** يحفظ «مكان الرجوع»: القسم + المستوى + العنصر + موضع التمرير (قبل فتح المشغل). */
-              private fun saveReturn(c: Channel) {
+              private fun saveReturn(c: Channel) = saveStateAt(c, lvl)
+
+              /**
+               * يحفظ الحالة كاملة (المستوى الحالي + الموسم/الحلقات + الفوكس) — تُستعاد عند الرجوع من المشغل
+               * حتى بعد إعادة إنشاء الشاشة. played=null يعني «حافظ على الفوكس الحالي».
+               */
+              private fun saveStateAt(played: Channel?, lv: Int) {
                   try {
+                      if (played != null) {
+                          lastPlayedId = played.id
+                          lastPlayedUrl = if (played.url.isNotBlank()) played.url else played.alt
+                          lastName = played.name
+                      }
                       sp.put("ret_kind", kind)
-                      sp.put("ret_level", if (inEpisodes) "1" else "0")
+                      sp.put("ret_lvl", lv.toString())
+                      sp.put("ret_level", if (lv > 0) "1" else "0")
                       sp.put("ret_series", seriesName)
                       sp.put("ret_mid", curSeriesMid)
+                      sp.put("ret_section", sectionTitle)
                       sp.put("ret_cat", selCat?.name ?: "")
                       sp.put("ret_played_url", lastPlayedUrl)
                       sp.put("ret_played_id", lastPlayedId)
                       sp.put("ret_played_name", lastName)
-                      sp.put("ret_idx", items.indexOfFirst { sameItem(it, c) }.toString())
+                      sp.put("ret_idx", items.indexOfFirst { sameItem(it, played ?: lastPlayedIdOrEmpty()) }.toString())
                       sp.put("ret_scroll", firstVisible().toString())
-                      sp.put("ret_items", if (inEpisodes) encodeChans(items) else "")
+                      val mark = played ?: lastPlayedIdOrEmpty()
+                      sp.put("ret_list_idx", if (lv == 0) items.indexOfFirst { sameItem(it, mark) }.toString() else idxOf(saved, seriesCh).toString())
+                      sp.put("ret_series_idx", idxOf(saved, seriesCh).toString())
+                      sp.put("ret_season_idx", idxOf(seasonsList, seasonCh).toString())
+                      sp.put("ret_season_id", seasonCh?.id ?: "")
+                      sp.put("ret_series_id", seriesCh?.id ?: "")
+                      sp.put("ret_seasons", if (lv >= 1) encodeChans(seasonsList) else "")
+                      sp.put("ret_eps", if (lv >= 2) encodeChans(epsList) else "")
+                      sp.put("ret_eps_idx", epsList.indexOfFirst { sameItem(it, played ?: lastPlayedIdOrEmpty()) }.toString())
+                      sp.put("ret_items", if (lv > 0) encodeChans(items) else "")
                       sp.put("ret_pending", "1")
                   } catch (t: Throwable) { Crash.log(t) }
               }
+
+              private fun lastPlayedIdOrEmpty(): Channel = Channel().apply { id = lastPlayedId; name = lastName; url = lastPlayedUrl }
+
+              private fun idxOf(list: List<Channel>, c: Channel?): Int {
+                  if (c == null || list.isEmpty()) return -1
+                  return list.indexOfFirst { sameItem(it, c) }
+              }
+
+              /** موقع المسلسل داخل قائمة القسم (نستعمله لرجوع «موسم → مسلسل» بعد إعادة إنشاء الشاشة). */
+              private fun allSnapshotIdx(c: Channel): Int =
+                  try { saved.indexOfFirst { sameItem(it, c) } } catch (t: Throwable) { -1 }
 
               private fun firstVisible(): Int = try {
                   (rvGrid.layoutManager as? LinearLayoutManager)?.findFirstVisibleItemPosition() ?: 0
               } catch (t: Throwable) { 0 }
 
-              /** يستعيد «مكان الرجوع» — نفس القسم ونفس العنصر (يشتغل حتى بعد إعادة إنشاء الشاشة). */
+              /** يستعيد «مكان الرجوع» — نفس القسم ونفس المستوى ونفس العنصر (يشتغل حتى بعد إعادة إنشاء الشاشة). */
               private fun restoreReturn() {
                   val k = sp.s("ret_kind").ifBlank { kind }
                   kind = k
@@ -2078,26 +2142,64 @@ jobs:
                   lastName = sp.s("ret_played_name")
                   lastPlayedId = sp.s("ret_played_id")
                   lastPlayedUrl = sp.s("ret_played_url")
+                  val lv = sp.s("ret_lvl", if (sp.s("ret_level") == "1") "2" else "0").toIntOrNull() ?: 0
                   val idx = sp.s("ret_idx").toIntOrNull() ?: -1
-                  if (sp.s("ret_level") == "1") {
-                      val items0 = ArrayList<Channel>()
-                      decodeChans(sp.s("ret_items"), items0)
-                      if (items0.isNotEmpty()) {                 // نفس قائمة المواسم/الحلقات التي كان فيها
+                  val section = sp.s("ret_section")
+                  if (section.isNotBlank()) sectionTitle = section
+
+                  // (أ) الحلقات: نعيد المستويات الثلاثة كما كانت
+                  if (lv >= 2) {
+                      val eps = ArrayList<Channel>()
+                      decodeChans(sp.s("ret_eps"), eps)
+                      val seasons = ArrayList<Channel>()
+                      decodeChans(sp.s("ret_seasons"), seasons)
+                      if (eps.isNotEmpty()) {
+                          build()                                     // قائمة القسم (تحت الموسم) للرجوع إليها لاحقًا
+                          if (saved.isEmpty() && all.none { it.stype == "season" }) saved.addAll(all)
+                          seasonsList.clear(); seasonsList.addAll(seasons)
+                          epsList.clear(); epsList.addAll(eps)
+                          lvl = 2
                           inEpisodes = true
                           seriesName = sp.s("ret_series")
                           curSeriesMid = sp.s("ret_mid")
-                          all.clear()
-                          all.addAll(items0)
+                          all.clear(); all.addAll(eps)
                           cats.clear()
                           cats.add(Group().apply { name = "ALL"; special = "all"; count = all.size })
-                          title.text = seriesName
+                          title.text = seriesName.ifBlank { sectionTitle }
                           applyFilter()
                           rvCats.adapter = CatAdapter()
-                          rvGrid.scrollToPosition(if (idx in items.indices) idx else 0)
+                          val pos = if (idx in items.indices) idx else (sp.s("ret_eps_idx").toIntOrNull() ?: 0)
+                          try { rvGrid.scrollToPosition(pos.coerceAtLeast(0)) } catch (t: Throwable) {}
                           adapter.notifyDataSetChanged()
                           return
                       }
                   }
+                  // (ب) المواسم: نرجع لمستوى المواسم والفوكس على الموسم
+                  if (lv >= 1) {
+                      val seasons = ArrayList<Channel>()
+                      decodeChans(sp.s("ret_seasons"), seasons)
+                      if (seasons.isNotEmpty()) {
+                          build()
+                          if (saved.isEmpty() && all.none { it.stype == "season" }) saved.addAll(all)
+                          seasonsList.clear(); seasonsList.addAll(seasons)
+                          lvl = 1
+                          inEpisodes = true
+                          seriesName = sp.s("ret_series")
+                          curSeriesMid = sp.s("ret_mid")
+                          all.clear(); all.addAll(seasons)
+                          cats.clear()
+                          cats.add(Group().apply { name = "ALL"; special = "all"; count = all.size })
+                          title.text = seriesName.ifBlank { sectionTitle }
+                          applyFilter()
+                          rvCats.adapter = CatAdapter()
+                          val pos = sp.s("ret_idx").toIntOrNull() ?: -1
+                          try { rvGrid.scrollToPosition((if (pos in items.indices) pos else 0).coerceAtLeast(0)) } catch (t: Throwable) {}
+                          adapter.notifyDataSetChanged()
+                          return
+                      }
+                  }
+                  // (ج) القائمة (أفلام/مسلسلات)
+                  lvl = 0
                   inEpisodes = false
                   seriesName = ""
                   build()                                        // قائمة الأفلام/المسلسلات من الكتالوج
@@ -2109,6 +2211,43 @@ jobs:
                   val pos = if (idx in items.indices) idx else (sp.s("ret_scroll").toIntOrNull() ?: 0)
                   try { rvGrid.scrollToPosition(pos.coerceAtLeast(0)) } catch (t: Throwable) {}
                   adapter.notifyDataSetChanged()
+              }
+
+              /** يضع الفوكس (▶) على عنصر — يُستعمل عند الرجوع مستوى لأعلى. */
+              private fun markOn(c: Channel?) {
+                  if (c == null) return
+                  lastPlayedId = c.id
+                  lastPlayedUrl = if (c.url.isNotBlank()) c.url else c.alt
+                  lastName = c.name
+              }
+
+              /** الرجوع مستوى لأعلى داخل نفس الشاشة: حلقة → مواسم (فوكس على الموسم) → قائمة (فوكس على المسلسل). */
+              private fun upLevel(): Boolean {
+                  if (lvl >= 2 && seasonsList.isNotEmpty()) {
+                      lvl = 1
+                      inEpisodes = true
+                      all.clear(); all.addAll(seasonsList)
+                      seriesName = (seriesCh?.name ?: seriesName) + (seriesCh?.group?.let { " • " + it } ?: "")
+                      title.text = if (seriesName.isNotBlank()) seriesName.substringBefore(" • ") else sectionTitle
+                      markOn(seasonCh)
+                      applyFilter(); rvCats.adapter = CatAdapter()
+                      saveStateAt(null, 1)
+                      try { rvGrid.post { scrollToLast() } } catch (t: Throwable) {}
+                      return true
+                  }
+                  if (lvl >= 1 && saved.isNotEmpty() && saved.none { it.stype == "season" }) {
+                      lvl = 0
+                      inEpisodes = false
+                      seriesName = ""
+                      all.clear(); all.addAll(saved)
+                      title.text = sectionTitle
+                      markOn(seriesCh)
+                      applyFilter(); rvCats.adapter = CatAdapter()
+                      saveStateAt(null, 0)
+                      try { rvGrid.post { scrollToLast() } } catch (t: Throwable) {}
+                      return true
+                  }
+                  return false
               }
 
               private fun sameItem(a: Channel, b: Channel): Boolean {
@@ -2131,15 +2270,20 @@ jobs:
               }
 
               private fun back() {
+                  // رجوع هرمي: حلقات → مواسم → قائمة → خروج
+                  if (upLevel()) return
                   if (inEpisodes) {
                       inEpisodes = false
+                      lvl = 0
                       seriesName = ""
                       all.clear()
                       if (saved.isNotEmpty()) { all.addAll(saved); saved.clear() }
                       else all.addAll(if (kind == "movie") Catalog.movie else Catalog.series)
                       applyFilter()
                       rvCats.adapter = CatAdapter()
-                  } else finish()
+                      return
+                  }
+                  finish()
               }
 
               override fun onResume() {
@@ -2413,10 +2557,10 @@ jobs:
                   bind()                                     // ← أولًا: هنا تُعيَّن pv/pvFull وباقي العناصر
                   // نسبة الصورة: «تكبير يملأ الشاشة» افتراضيًا (يملأ الهاتف بلا شدّ). ترقية مرة واحدة من 8.17
                   // (النسخة السابقة كانت تحفظ 16:9 الثابتة تلقائيًا ⇒ أشرطة سوداء على الجانبين)
-                  if (sp.s("rm4", "") != "1") {
+                  if (sp.s("rm5", "") != "1") {
                       sp.put("rm2", "1")                     // تلقائي: يملأ شاشة الهاتف
                       sp.put("rm_man", "0")
-                      sp.put("rm4", "1")
+                      sp.put("rm5", "1")
                   }
                   pv.controllerAutoShow = !tv                // (كان قبل bind() → استثناء يفتح شاشة المشغل = طيّاح التطبيق)
                   pv.controllerShowTimeoutMs = if (tv) 2600 else 4200
@@ -2596,11 +2740,13 @@ jobs:
                       }
                       val cmd0 = url
                       pendingPlayer(c, full0, "جارٍ تجهيز رابط البوابة…")
-                      Loader.macPlayable(p, c.kind, cmd0, c.mid, c.sid, c.id) { u ->
+                      Loader.macPlayable(p, c.kind, cmd0, c.mid, c.sid, c.id, c.snum, c.group) { u ->
                           if (mySeq != playSeq) return@macPlayable     // ضغط المستخدم على عنصر آخر
                           try {
                               busy(false, "")
                               if (u.isBlank()) {
+                                  val info = try { StalkerSession.get(p).lastEpsInfo } catch (t: Throwable) { "" }
+                                  if (info.isNotBlank()) Crash.note("PLAY-FAIL", "kind=${c.kind} mid=${c.mid} sid=${c.sid} snum=${c.snum} ep=${c.id} :: " + info.take(300))
                                   showPlayerError("البوابة لم تُرجع رابطًا لهذا العنصر\n" + Catalog.status.take(160))
                                   return@macPlayable
                               }
@@ -2755,6 +2901,17 @@ jobs:
                * نسبة الصورة (v8.19): 1 تلقائي — يملأ شاشة الهاتف بلا شدّ (قصّ خفيف فقط) وهو الافتراضي،
                * 0 ملاءمة مضبوطة (الصورة كاملة بأشرطة)، 2 تمديد، 3 نسبة 16:9 ثابتة، 4 نسبة 4:3 ثابتة.
                */
+              /**
+               * (8.20) اختيار تلقائي على حساب شاشة الهاتف وأبعاد الفيديو:
+               *   الفيديو 16:9 أو أعرض ⇒ «يملأ الشاشة» (بلا أشرطة، قصّ خفيف في الجوانب).
+               *   الفيديو أضيق (4:3 أو عمودي) ⇒ «ملاءمة كاملة» (لا تكبير عنيف يخرّب الصورة).
+               */
+              private fun autoModeFor(w: Int, h: Int): String {
+                  if (w <= 0 || h <= 0) return "1"
+                  val va = w.toFloat() / h.toFloat()
+                  return if (va >= 1.55f) "1" else "0"
+              }
+
               private fun applyResize() {
                   val mode = sp.s("rm2", "1")
                   val rm = when (mode) {
@@ -2913,11 +3070,11 @@ jobs:
 
               /** اسم نسبة الصورة الحالية (تظهر في الإعدادات وفي التنبيه). */
               private fun ratioLabel(m: String): String = when (m) {
-                  "1" -> "تلقائي — يملأ شاشة الهاتف"
+                  "1" -> "تلقائي — يملأ شاشة الهاتف (16:9)"
                   "2" -> "تمديد"
                   "3" -> "16:9 ثابتة"
                   "4" -> "4:3 ثابتة"
-                  else -> "ملاءمة مضبوطة (أشرطة)"
+                  else -> "ملاءمة كاملة (تلقائي للأفلام الأضيق)"
               }
 
               /* ================================ SmartLoad ================================ */
@@ -2976,8 +3133,14 @@ jobs:
                   lastW = w
                   lastH = h
                   fullQual.text = if (w > 0 && h > 0) "$w×$h" else ""
-                  // تلقائي على حساب شاشة الهاتف: يُعاد ضبط الصندوق مع كل فيديو ما لم يختر المستخدم وضعًا بنفسه
-                  if (sp.s("rm_man", "0") != "1") { try { applyResize() } catch (t: Throwable) { Crash.log(t) } }
+                  // تلقائي على حساب شاشة الهاتف: الوضع يُختار من أبعاد الفيديو نفسه ما لم يختر المستخدم يدويًا
+                  if (sp.s("rm_man", "0") != "1") {
+                      try {
+                          val m = autoModeFor(w, h)
+                          if (m != sp.s("rm2", "1")) sp.put("rm2", m)
+                          applyResize()
+                      } catch (t: Throwable) { Crash.log(t) }
+                  }
                   // لا نبدّل نسبة الصورة تلقائيًا: الأبعاد المقلوبة من السرفر لا تُغيّر الصورة المعروضة،
                   // والتبديل التلقائي كان يضعها في إطار 16:9 بأشرطة سوداء (شكوى 8.17). التبديل يدوي بضغطة مطوّلة.
               }
@@ -5491,6 +5654,12 @@ jobs:
                   c.logo = str(e, "screenshot_uri", "screenshot").ifBlank { cover }
                   c.mid = seriesId
                   c.sid = seasonId
+                  c.snum = displayNum(seasonId, seasonName, "")
+                  if (c.id.isBlank()) {
+                      // بعض البوابات ترسل الحلقة بلا id: نأخذ الرقم من الأمر أو من الاسم (كود Java يعتمد على id)
+                      val fromCmd = Regex("(\\d{1,7})").find(c.url)?.groupValues?.get(1) ?: ""
+                      c.id = fromCmd.ifBlank { (if (c.num > 0) c.num.toString() else "") }
+                  }
                   c.catId = seriesId
                   c.extra = str(e, "rating")
                   return c
@@ -5513,6 +5682,14 @@ jobs:
                   return m.value.removeSuffix("\\")
               }
 
+              /** (8.20) تشخيص محاولات الحلقة الأخيرة (يُقرأ من سجل الأعطال). */
+              private fun diagEps(q: String) {
+                  try {
+                      val s = q.substringAfter("create_link", "").take(120)
+                      lastEpsInfo = (if (lastEpsInfo.length > 300) lastEpsInfo.takeLast(300) else lastEpsInfo) + " | " + s
+                  } catch (t: Throwable) {}
+              }
+
               /** أمر create_link الداخلي العائد (بعض البوابات ترد بـ cmd جديد بدل الرابط). */
               private fun innerCmd(response: String): String {
                   val js = jsOf(response) as? JSONObject ?: return ""
@@ -5523,11 +5700,13 @@ jobs:
               }
 
               /** أمر base64 للحلقات: {"series_id":..,"season_num":..,"type":"series"} — صيغة Stalker القياسية. */
-              fun seriesCmd(mid: String, sid: String): String {
+              fun seriesCmd(mid: String, sid: String, num: Int = 0): String {
                   val j = JSONObject()
                   val sRaw = mid.substringBefore(":").trim()
                   val sVal: Any = sRaw.toIntOrNull() ?: sRaw
-                  val nRaw = sid.substringAfterLast(":").trim()
+                  // season_num = رقم الموسم (1،2،3…). المعرّف الكبير من السرفر (501) يُرفض في create_link،
+                  // لذلك نستعمل الرقم المعلوم، وإلا نجرّب المفتاح كما هو (نفس ترتيب كود Java).
+                  val nRaw = if (num > 0) num.toString() else sid.substringAfterLast(":").trim()
                   val nVal: Any = nRaw.toIntOrNull() ?: if (nRaw.isBlank()) "1" else nRaw
                   j.put("series_id", sVal)
                   j.put("season_num", nVal)
@@ -5563,7 +5742,8 @@ jobs:
                *   4) آخر حل: أمر يبدو مباشرًا (http/rtsp/udp/rtmp) → يُعاد كما هو.
                *   5) فشل الجميع → "" مع رسالة واضحة (بدل تشغيل شيء خاطئ).
                */
-              fun playable(kind: String, cmd: String, mid: String = "", sid: String = "", epId: String = ""): String {
+              fun playable(kind: String, cmd: String, mid: String = "", sid: String = "",
+                           epId: String = "", snum: Int = 0, seasonName: String = ""): String {
                   val c = cleanCmd(cmd)
 
                   // (1) create_link بأمر البوابة — الأنسب أولًا لكل الأنواع
@@ -5584,18 +5764,31 @@ jobs:
                       }
                   }
 
-                  // (2) الحلقات: أمر base64 (المسار القياسي لبوابات MAC عند غياب الأمر)
+                  // (2) الحلقات: create_link بأمر base64 {"series_id","season_num","type":"series"}
+                  //     ثم &series=<معرّف الحلقة> — نفس دالة loadAndPlayEpisode في كود Java بالحرف.
+                  //     جرّب رقم الموسم المعلوم أولًا، ثم مفتاح السرفر (بعض البوابات تطلب معرّفها).
                   if (kind == "episode" && (mid.isNotBlank() || epId.isNotBlank())) {
-                      val b64 = seriesCmd(if (mid.isNotBlank()) mid else epId, sid)
-                      val ids = ArrayList<String>()
-                      if (epId.isNotBlank()) ids.add(epId)
-                      ids.add("")
-                      for (id in ids) {
-                          var q = "type=vod&action=create_link&cmd=" + Uri.encode(b64) + "&js_price=0&forced_country="
-                          if (id.isNotBlank()) q += "&series=" + Uri.encode(id)
-                          val r = req(q) ?: continue
-                          val u = done(urlFrom(r))
-                          if (u.isNotBlank()) return u
+                      val nums = ArrayList<Int>()
+                      if (snum > 0) nums.add(snum)
+                      val fromName = Regex("(?i)(?:موسم|season)\\s*0*(\\d{1,3})").find(seasonName)?.groupValues?.get(1)?.toIntOrNull()
+                      if (fromName != null && fromName > 0 && fromName != snum) nums.add(fromName)
+                      nums.add(0)                                   // 0 = استعمل مفتاح السرفر كما هو
+                      for (n in nums) {
+                          val b64 = seriesCmd(if (mid.isNotBlank()) mid else epId, sid, n)
+                          val ids = ArrayList<String>()
+                          if (epId.isNotBlank()) ids.add(epId)
+                          val numOnly = epId.filter { it.isDigit() }
+                          if (numOnly.isNotBlank() && numOnly != epId) ids.add(numOnly)
+                          ids.add("")
+                          for (id in ids) for (t in arrayOf("vod", "series")) {
+                              var q = "type=$t&action=create_link&cmd=" + Uri.encode(b64) + "&js_price=0&forced_country="
+                              if (id.isNotBlank()) q += "&series=" + Uri.encode(id)
+                              val r = req(q)
+                              diagEps(q)
+                              if (r == null) continue
+                              val u = done(urlFrom(r))
+                              if (u.isNotBlank()) return u
+                          }
                       }
                   }
 
@@ -5707,7 +5900,7 @@ jobs:
                * مثال الاستدعاء من الواجهة:  Catalog.play(profile, ch) { url -> openPlayer(url) }
                */
               fun play(p: Profile, c: Channel, cb: (String) -> Unit) {
-                  if (p.type == "mac") Loader.macPlayable(p, c.kind, c.url, c.mid, c.sid, c.id, cb)
+                  if (p.type == "mac") Loader.macPlayable(p, c.kind, c.url, c.mid, c.sid, c.id, c.snum, c.group, cb)
                   else Bg.ui { cb(c.url) }
               }
 
@@ -6109,7 +6302,8 @@ jobs:
                * الضغط = تشغيل: يحوّل cmd البوابة إلى رابط HTTP عبر الجلسة المحفوظة.
                * يرجع "" عند الفشل (فتظهر رسالة واضحة بدل تشغيل شيء خاطئ).
                */
-              fun macPlayable(p: Profile, kind: String, cmd: String, mid: String = "", sid: String = "", epId: String = "", cb: (String) -> Unit) {
+              fun macPlayable(p: Profile, kind: String, cmd: String, mid: String = "", sid: String = "",
+                              epId: String = "", snum: Int = 0, seasonName: String = "", cb: (String) -> Unit) {
                   // ملاحظة مهمة: أمر البوابة (cmd) قد يبدو رابطًا كاملًا لكنه يمرّ عبر مسار البوابة،
                   // لذلك لا نُعيده كما هو — بل نحوّله عبر create_link (نفس سلوك دالة Java) ثم نُشغّل.
                   Bg.pool.execute {
@@ -6119,7 +6313,7 @@ jobs:
                           var cmd0 = cmd
                           if (cmd0.isBlank()) cmd0 = Stalker.localCmd(if (epId.isNotBlank()) epId else if (mid.isNotBlank()) mid else "")
                           val st = StalkerSession.get(p)
-                          if (st.connect()) u = st.playable(kind, cmd0, mid, sid, epId)
+                          if (st.connect()) u = st.playable(kind, cmd0, mid, sid, epId, snum, seasonName)
                           else Catalog.status = st.lastError
                       } catch (t: Throwable) { Crash.log(t) }
                       val fu = u
@@ -6129,7 +6323,7 @@ jobs:
 
               /** نفس الدالة لكن تأخذ القناة نفسها (لأي استدعاء من الواجهة). */
               fun macPlayable(p: Profile, c: Channel, cb: (String) -> Unit) =
-                  macPlayable(p, c.kind, c.url, c.mid, c.sid, c.id, cb)
+                  macPlayable(p, c.kind, c.url, c.mid, c.sid, c.id, c.snum, c.group, cb)   // group الحلقة = اسم الموسم
 
               /** رابط القبض (timeshift) لبوابات MAC. */
               fun macTimeshift(p: Profile, cmd: String, hours: Int, cb: (String) -> Unit) {
@@ -7329,7 +7523,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.19 (code 819)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.20 (code 820)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
