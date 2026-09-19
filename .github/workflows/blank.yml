@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.14"
-      VERSION_CODE: "814"
+      VERSION_NAME: "8.15"
+      VERSION_CODE: "815"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 814)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.14")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 815)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.15")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -308,6 +308,15 @@ jobs:
           | الفلم يظهر بمشغل صغير | `toggleFull` كانت تُنادى فقط عند `asFull` | **مثل كود Java** (`if (doubleClick \|\| !isLive) toggleFull(true)`): كل فلم/حلقة تُفتح **ملء الشاشة** |
           | الصورة لا تملأ الشاشة | `RESIZE_MODE_FIT` | نمط حجم الصورة محفوظ: **تكبير يملأ الشاشة** (افتراضي) + خيار في الإعدادات السريعة: ملاءمة / تكبير / تمديد — وضغطة طويلة على زر التوسيع تبدّل مباشرة |
           | المسلسل يبيّن حلقات بدل المواسم | الشجرة كانت تُفرّغ الحلقات داخل القائمة | **مثل كود Java** (`findOrCreateStalkerSeasonFolder`): الشجرة تُنتج **بطاقة لكل موسم** («موسم 1 • 4 حلقة»)، والضغط على الموسم يجيب حلقاته (`fetchStalkerEpisodes`: 3 صيغ لطلب الحلقات) |
+
+          ## 8.15 — المشغل الكبير يملأ الشاشة + المواسم والحلقات من كود Java حرفيًا
+
+          | ما طلبتَه | ما صار في الكود |
+          |---|---|
+          | الأفلام/المسلسلات بمشغل **كبير يملأ الشاشة** | `toggleFull(true)` تُنادى **قبل** تجهيز المشغّل، وإسناد المشغّل للمشهد الكبير مباشرة (`pvFull.player = p`) بدل `switchTargetView` — أضمن على كل الأجهزة. البطاقة الصغيرة (`pipBox`) وصندوق القناة لا يظهران فوق المشغل الكامل، والصورة بنمط **تكبير يملأ الشاشة** |
+          | المواسم لا تظهر | `seriesTree` = نفس `fetchStalkerSeriesTree`: 3 صيغ للرابط بـ `force_ch_link_check=1`، ثم `processStalkerSeriesItems` بنفس شروطه (is_season / season_number / مجلد موسم / حلقة مباشرة) → بطاقات مواسم («موسم 1 • 4 حلقة») |
+          | الحلقات لا تظهر | `seasonEpisodes` = نفس `fetchStalkerEpisodes`: 3 صيغ للرابط (movie_id، movie_id=series:series، +season_id) + مطابقة الموسم `isSameMacPortalSeason` بالحرف (بما فيها صيغة `series:season`) + قراءة `server.series[]` + خازن الحلقات المدمجة (بلا طلب إضافي) |
+          | مؤشرات فارغة/بطاقة صغيرة | `looksLikeSeason`: بطاقة الموسم لا تُعتبر حلقة (كانت تتحول لحلقات وهمية) |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -2428,7 +2437,7 @@ jobs:
                           when (c.kind) { "live" -> "بث مباشر"; "movie" -> "فيلم"; "series" -> "مسلسل"; "episode" -> "حلقة"; else -> c.kind }
                       ).joinToString(" • ")
                       infoDesc.text = c.extra.ifBlank { "بانتظار البيانات…" }
-                      if (asFull && !full) toggleFull(true)
+                      if ((asFull || c.kind != "live") && !full) toggleFull(true)
                       dockBusy.visibility = View.VISIBLE; fullBusy.visibility = View.VISIBLE
                       tvLoadTxt.text = msg; tvFullPct.text = ""; tvLoadPct.text = ""
                       wdBar.visibility = View.GONE
@@ -2491,19 +2500,19 @@ jobs:
                   val meta = MediaMetadata.Builder().setTitle(c.name).build()
                   val item = MediaItem.Builder().setUri(url).setMediaMetadata(meta)
                       .setMimeType(mime).setTag(c.name).build()
+                  // نفس كود Java: الأفلام/الحلقات تُفتح ملء الشاشة — نُجهّز المشهد الكبير **قبل** التشغيل
+                  if ((asFull || c.kind != "live") && !full) toggleFull(true)
                   p.stop()
                   p.setMediaItem(item)
                   p.prepare()
                   p.playWhenReady = true
-                  pv.player = p
-                  if (full) pvFull.player = p
-                  if ((asFull || c.kind != "live") && !full) toggleFull(true)     // نفس كود Java: الأفلام/الحلقات ملء الشاشة
+                  if (full) { try { pvFull.player = p } catch (t: Throwable) { pv.player = p } } else pv.player = p
                   if (!full) { dockBusy.visibility = View.VISIBLE; tvLoadPct.text = "0%" }
                   else { fullBusy.visibility = View.VISIBLE; tvFullPct.text = "0%" }
                   armWd()
                   fetchEpg(c)
                   chanAdapter.notifyDataSetChanged()
-                  showPip(true)
+                  showPip(!full)                     // ما نُظهرش البطاقة الصغيرة فوق المشغل الكبير
               }
 
               private fun playAlt() {
@@ -2522,16 +2531,23 @@ jobs:
                   val p = player ?: return
                   if (on) {
                       fullBox.visibility = View.VISIBLE
+                      try { findViewById<View>(R.id.playerHolder)?.visibility = View.GONE } catch (t: Throwable) {}
+                      showPip(false)
                       goImmersive()
-                      try { PlayerView.switchTargetView(p, pv, pvFull) } catch (t: Throwable) { Crash.log(t) }
+                      // إسناد المشغّل للمشهد الكبير مباشرة (أضمن من switchTargetView على كل الأجهزة)
+                      try { pvFull.player = p } catch (t: Throwable) { Crash.log(t) }
+                      try { pv.player = null } catch (t: Throwable) { Crash.log(t) }
                       applyResize()
+                      try { pvFull.requestLayout() } catch (t: Throwable) {}
                       pvFull.useController = false
                       fullTitle.text = cur?.name ?: ""
                       findViewById<View>(R.id.fullBar)?.requestFocus()
                       hideBarsSoon()
                   } else {
                       fullBox.visibility = View.GONE
-                      try { PlayerView.switchTargetView(p, pvFull, pv) } catch (t: Throwable) { Crash.log(t) }
+                      try { findViewById<View>(R.id.playerHolder)?.visibility = View.VISIBLE } catch (t: Throwable) {}
+                      try { pv.player = p } catch (t: Throwable) { Crash.log(t) }
+                      try { pvFull.player = null } catch (t: Throwable) { Crash.log(t) }
                   }
               }
 
@@ -4655,78 +4671,267 @@ jobs:
                   return out.size
               }
 
-              fun seriesTree(seriesId: String, genre: String, cover: String, out: MutableList<Channel>): Int {
+              /**
+               * شجرة المسلسل — **نفس كود Java** (`fetchStalkerSeriesTree` + `tryStalkerSeriesUrl` +
+               * `processStalkerSeriesItems`): 3 صيغ للرابط (بـ force_ch_link_check=1)، ومعالجة العناصر:
+               *   • موسم فيه حلقات مدمجة → مجلد موسم + حلقاته في الخازن
+               *   • موسم بلا حلقات → مجلد موسم (الحلقات تُجلب عند الضغط عليه)
+               *   • حلقة مباشرة (فيها cmd) → حلقة
+               */
+              fun seriesTree(seriesId0: String, genre: String, cover: String, out: MutableList<Channel>): Int {
+                  val seriesId = seriesId0.replace("series_", "").trim()
+                  if (seriesId.isBlank()) return 0
                   val enc = Uri.encode(seriesId)
                   val urls = listOf(
-                      "type=series&action=get_series_info&movie_id=$enc",
                       "type=series&action=get_ordered_list&movie_id=$enc&p=1&force_ch_link_check=1",
                       "type=vod&action=get_ordered_list&movie_id=$enc&p=1&force_ch_link_check=1",
-                      "type=series&action=get_ordered_list&series_id=$enc&p=1&force_ch_link_check=1"
+                      "type=series&action=get_ordered_list&series_id=$enc&p=1&force_ch_link_check=1",
+                      "type=series&action=get_series_info&movie_id=$enc"
                   )
                   for (u in urls) {
                       val r = req(u) ?: continue
-                      var added = 0
-                      val js = jsOf(r)
-                      val seasons = if (js is JSONObject) js.optJSONObject("series") else null
-                      if (seasons != null) {
-                          // مثل كود Java: نعرض **المواسم** كبطاقات، والحلقات تُجلب عند الضغط على الموسم
-                          val keys = ArrayList<String>()
-                          val it = seasons.keys(); while (it.hasNext()) keys.add(it.next())
-                          keys.sortBy { it.toIntOrNull() ?: 9999 }
-                          for (k in keys) {
-                              val sd = seasons.optJSONObject(k) ?: continue
-                              val seasonName = sd.optString("name").ifBlank { "موسم $k" }
-                              val eps = sd.optJSONArray("series") ?: sd.optJSONArray("episodes")
-                              val cnt = eps?.length() ?: 0
-                              out.add(Channel().apply {
-                                  kind = "season"; stype = "season"
-                                  name = if (cnt > 0) "$seasonName • $cnt حلقة" else seasonName
-                                  group = if (genre.isBlank()) "مسلسلات" else genre
-                                  id = "season_" + seriesId + "_" + k; mid = seriesId; sid = k
-                                  logo = cover; catId = seriesId
-                                  extra = seasonName
-                              })
-                              added++
-                          }
-                      }
-                      if (added == 0) {
-                          val arr = itemsOf(r)
-                          for (i in 0 until arr.length()) {
-                              val o = arr.optJSONObject(i) ?: continue
-                              val nested = o.optJSONArray("series") ?: o.optJSONArray("episodes")
-                              val seasonNum = str(o, "season_number", "season_num", "season_id")
-                              if (nested != null && nested.length() > 0) {
-                                  val sName = str(o, "name", "title").ifBlank { "موسم " + seasonNum.ifBlank { (i + 1).toString() } }
-                                  val sId = str(o, "id", "season_id").ifBlank { seasonNum }
-                                  for (e in 0 until nested.length()) {
-                                      val ep = nested.optJSONObject(e) ?: continue
-                                      out.add(episodeChannel(ep, seriesId, sId, sName, genre, cover, out.size))
-                                      added++
-                                  }
-                              } else if (str(o, "cmd", "media_url").isBlank() &&
-                                  (seasonNum.isNotBlank() || str(o, "name").lowercase().contains("season") || str(o, "name").contains("موسم"))) {
-                                  out.add(Channel().apply {
-                                      kind = "season"; stype = "season"
-                                      name = str(o, "name", "title").ifBlank { "موسم $seasonNum" }
-                                      group = if (genre.isBlank()) "مسلسلات" else genre
-                                      id = "season_" + seriesId + "_" + str(o, "id", "season_id")
-                                      mid = seriesId; sid = str(o, "season_id", "id", "season_number").ifBlank { seasonNum }
-                                      logo = cover; catId = seriesId
-                                  })
-                                  added++
-                              } else if (str(o, "cmd", "media_url").isNotBlank()) {
-                                  val c = toChannel(o, "episode", genre, seriesId, out.size + 1)
-                                  c.mid = seriesId
-                                  c.sid = str(o, "season_id", "season_number").ifBlank { seasonNum }
-                                  if (c.name.isBlank()) c.name = "الحلقة ${i + 1}"
-                                  c.kind = "episode"; c.stype = "episode"
-                                  out.add(c); added++
-                              }
-                          }
-                      }
-                      if (added > 0) return added
+                      val created = processSeriesItems(r, seriesId, genre, cover, out)
+                      if (created > 0) return out.size
                   }
-                  return seasonEpisodes(seriesId, "", out)
+                  return 0
+              }
+
+              /** نفس `processStalkerSeriesItems`: يحوّل عناصر الاستجابة إلى مواسم/حلقات. */
+              private fun processSeriesItems(json: String, seriesId: String, genre: String, cover: String, out: MutableList<Channel>): Int {
+                  var created = 0
+
+                  // (أ) خريطة المواسم: js = { "1": {name, series:[...]} } أو js.series = { ... }
+                  val js = jsOf(json)
+                  val mapObj: JSONObject? = when {
+                      js is JSONObject && js.optJSONObject("series") != null -> js.optJSONObject("series")
+                      js is JSONObject && looksLikeSeasonMap(js) -> js
+                      else -> null
+                  }
+                  if (mapObj != null) {
+                      val keys = ArrayList<String>()
+                      val it = mapObj.keys(); while (it.hasNext()) keys.add(it.next())
+                      keys.sortBy { it.toIntOrNull() ?: 9999 }
+                      for (k in keys) {
+                          val sd = mapObj.optJSONObject(k) ?: continue
+                          val eps = sd.optJSONArray("series") ?: sd.optJSONArray("episodes")
+                          val sName = str(sd, "name", "title").ifBlank { "موسم $k" }
+                          addSeasonFolder(out, seriesId, if (genre.isBlank()) "مسلسلات" else genre, cover, k, sName, eps, seriesId + "|" + k)
+                          created++
+                      }
+                      if (created > 0) return created
+                  }
+
+                  // (ب) مصفوفة عناصر (نفس منطق Java حرفيًا)
+                  val items = itemsOf(json)
+                  for (i in 0 until items.length()) {
+                      val item = items.optJSONObject(i) ?: continue
+                      val id = str(item, "id")
+                      val name = str(item, "name", "title")
+                      val cmd = cleanCmd(str(item, "cmd", "media_url", "url"))
+                      val explicitSeasonId = str(item, "season_id")
+                      val seasonNumber = str(item, "season_number", "season_num")
+                      val episodeNumber = str(item, "episode_number", "series_number")
+                      var nested = item.optJSONArray("series") ?: item.optJSONArray("episodes") ?: item.optJSONArray("seasons")
+                      val isSeasonStr = str(item, "is_season")
+                      val hasEpisodeMarkers = episodeNumber.isNotBlank() || item.has("episode_id") || item.has("series_number") || item.has("episode_number")
+                      val isSeason = !hasEpisodeMarkers && (item.optBoolean("is_season", false) || isSeasonStr == "1" ||
+                          isSeasonStr.equals("true", true) || explicitSeasonId.isNotBlank() || seasonNumber.isNotBlank() ||
+                          nested != null || (cmd.isBlank() && (name.contains("موسم") || name.lowercase().contains("season"))))
+                      val sKey = when {
+                          explicitSeasonId.isNotBlank() -> explicitSeasonId
+                          id.isNotBlank() -> id
+                          seasonNumber.isNotBlank() -> seasonNumber
+                          else -> name
+                      }
+                      when {
+                          nested != null && nested.length() > 0 -> {
+                              addSeasonFolder(out, seriesId, if (genre.isBlank()) "مسلسلات" else genre, cover, sKey,
+                                  name.ifBlank { "موسم $seasonNumber" }, nested, seriesId + "|" + sKey)
+                              created++
+                          }
+                          isSeason -> {
+                              addSeasonFolder(out, seriesId, if (genre.isBlank()) "مسلسلات" else genre, cover, sKey,
+                                  name.ifBlank { "موسم " + seasonNumber.ifBlank { id } }, null, seriesId + "|" + sKey)
+                              created++
+                          }
+                          cmd.isNotBlank() -> {
+                              out.add(episodeChannel(item, seriesId, if (explicitSeasonId.isNotBlank()) explicitSeasonId else seasonNumber, "", genre, cover, out.size))
+                              created++
+                          }
+                      }
+                  }
+                  return created
+              }
+
+              /** هل هذا العنصر بطاقة موسم (لا حلقة)؟ — نفس شروط كود Java. */
+              private fun looksLikeSeason(o: JSONObject): Boolean {
+                  val id = str(o, "id"); val name = str(o, "name", "title")
+                  val cmd = cleanCmd(str(o, "cmd", "media_url", "url"))
+                  val seasonNum = str(o, "season_number", "season_num")
+                  val epNum = str(o, "episode_number", "series_number")
+                  val isSeasonStr = str(o, "is_season")
+                  val hasEpisodeMarkers = epNum.isNotBlank() || o.has("episode_id") || o.has("series_number") || o.has("episode_number")
+                  if (hasEpisodeMarkers) return false
+                  if (o.optBoolean("is_season", false) || isSeasonStr == "1" || isSeasonStr.equals("true", true)) return true
+                  if (str(o, "season_id").isNotBlank() || seasonNum.isNotBlank()) return true
+                  if (cmd.isBlank() && (name.contains("موسم") || name.lowercase().contains("season"))) return true
+                  return false
+              }
+
+              /** يفهم إن كان هذا JSONObject خريطة مواسم (مفاتيح أرقام). */
+              private fun looksLikeSeasonMap(o: JSONObject): Boolean {
+                  val it = o.keys()
+                  var seen = 0
+                  while (it.hasNext()) {
+                      val k = it.next()
+                      if (k.toIntOrNull() != null || k.lowercase().contains("season")) { seen++; if (seen > 0) return true }
+                      if (k == "data" || k == "cmd" || k == "token") return false
+                  }
+                  return false
+              }
+
+              /** ينشئ بطاقة موسم (ويحفظ حلقاته المدمجة في الخازن إن وُجدت). */
+              private fun addSeasonFolder(out: MutableList<Channel>, seriesId: String, genre: String, cover: String,
+                                          seasonKey: String, seasonName: String, eps: JSONArray?, cacheKey: String) {
+                  val cnt = eps?.length() ?: 0
+                  out.add(Channel().apply {
+                      kind = "season"; stype = "season"
+                      name = if (cnt > 0) "$seasonName • $cnt حلقة" else seasonName
+                      group = genre
+                      id = "season_" + seriesId + "_" + seasonKey
+                      mid = seriesId; sid = seasonKey
+                      logo = cover; catId = seriesId
+                      extra = seasonName
+                  })
+                  if (eps != null && eps.length() > 0) {
+                      val list = ArrayList<Channel>()
+                      for (k in 0 until eps.length()) {
+                          val e = eps.optJSONObject(k) ?: continue
+                          list.add(episodeChannel(e, seriesId, seasonKey, seasonName, genre, cover, k))
+                      }
+                      if (list.isNotEmpty()) synchronized(seasonCache) { seasonCache[cacheKey] = list }
+                  }
+              }
+
+              /** خازن حلقات المواسم المدمجة في الاستجابة (بلا طلب إضافي). */
+              private val seasonCache = HashMap<String, List<Channel>>()
+
+              /**
+               * حلقات موسم — **نفس كود Java** (`fetchStalkerEpisodes`):
+               * 3 صيغ للرابط + مطابقة الموسم `isSameMacPortalSeason` + قراءة `server.series[]`.
+               */
+              fun seasonEpisodes(seriesId0: String, seasonId: String, out: MutableList<Channel>): Int {
+                  val seriesId = seriesId0.replace("series_", "").trim()
+                  if (seriesId.isBlank()) return 0
+                  // (0) حلقات مدمجة محفوظة من الشجرة (بلا شبكة)
+                  synchronized(seasonCache) {
+                      val hit = seasonCache[seriesId + "|" + seasonId]
+                      if (hit != null && hit.isNotEmpty()) { out.addAll(hit); return hit.size }
+                  }
+                  val enc = Uri.encode(seriesId)
+                  val urls = ArrayList<String>()
+                  urls.add("type=series&action=get_ordered_list&movie_id=$enc&p=1")
+                  if (!seriesId.contains(":")) urls.add("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$seriesId") + "&p=1")
+                  if (seasonId.isNotBlank()) urls.add("type=series&action=get_ordered_list&movie_id=$enc&season_id=" + Uri.encode(seasonId) + "&p=1")
+                  urls.add("type=series&action=get_series_info&movie_id=$enc")
+                  for (u in urls) {
+                      val r = req(u) ?: continue
+                      val n = parseSeasonEpisodes(r, seriesId, seasonId, out)
+                      if (n > 0) return n
+                  }
+                  // آخر حل: نفس صيغة النجاة (movie_id = series:season)
+                  if (seasonId.isNotBlank()) {
+                      val r = req("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$seasonId") + "&p=1")
+                      if (r != null) return parseSeasonEpisodes(r, seriesId, seasonId, out)
+                  }
+                  return 0
+              }
+
+              /** يقرأ حلقات الموسم من الاستجابة (نفس حلقة Java داخل `fetchStalkerEpisodesRequest`). */
+              private fun parseSeasonEpisodes(json: String, seriesId: String, seasonId: String, out: MutableList<Channel>): Int {
+                  // خريطة مواسم: js = {"1": {series:[...]}}
+                  val js = jsOf(json)
+                  val mapObj: JSONObject? = when {
+                      js is JSONObject && js.optJSONObject("series") != null -> js.optJSONObject("series")
+                      js is JSONObject && looksLikeSeasonMap(js) -> js
+                      else -> null
+                  }
+                  if (mapObj != null) {
+                      val keys = ArrayList<String>()
+                      val it = mapObj.keys(); while (it.hasNext()) keys.add(it.next())
+                      for (k in keys) {
+                          if (!isSameSeason(seasonId, k, k, k)) continue
+                          val sd = mapObj.optJSONObject(k) ?: continue
+                          val eps = sd.optJSONArray("series") ?: sd.optJSONArray("episodes") ?: continue
+                          val sName = str(sd, "name", "title").ifBlank { "موسم $k" }
+                          for (i in 0 until eps.length()) {
+                              val e = eps.optJSONObject(i) ?: continue
+                              val c = episodeChannel(e, seriesId, if (isSameSeason(seasonId, k, k, k)) k else seasonId, sName, "", "", out.size)
+                              if (out.none { it.id == c.id }) out.add(c)
+                          }
+                      }
+                      if (out.isNotEmpty()) return out.size
+                  }
+
+                  val arr = itemsOf(json)
+                  var added = 0
+                  for (i in 0 until arr.length()) {
+                      val season = arr.optJSONObject(i) ?: continue
+                      val returnedId = str(season, "id").trim()
+                      val returnedSeasonId = str(season, "season_id").trim()
+                      val returnedSeasonNumber = str(season, "season_number").trim()
+                      val nested = season.optJSONArray("series") ?: season.optJSONArray("episodes")
+                      val same = isSameSeason(seasonId, returnedId, returnedSeasonId, returnedSeasonNumber)
+                      if (!same) continue
+                      if (nested == null || nested.length() == 0) continue
+                      val sId = if (returnedId.isNotBlank()) returnedId else seasonId
+                      val sName = str(season, "name", "title").ifBlank { "موسم " + returnedSeasonNumber.ifBlank { sId } }
+                      for (e in 0 until nested.length()) {
+                          val ep = nested.optJSONObject(e) ?: continue
+                          val c = episodeChannel(ep, seriesId, sId, sName, "", "", out.size)
+                          if (out.none { it.id == c.id }) { out.add(c); added++ }
+                      }
+                  }
+                  // لو ما كانش تصنيف مواسم في الرد: العناصر نفسها حلقات (بوابات مسطّحة)
+                  if (added == 0 && arr.length() > 0) {
+                      var flat = 0
+                      for (i in 0 until arr.length()) {
+                          val o = arr.optJSONObject(i) ?: continue
+                          if (o.optJSONArray("series") != null || o.optJSONArray("episodes") != null) continue
+                          if (looksLikeSeason(o)) continue          // بطاقة موسم ≠ حلقة
+                          val cmd = cleanCmd(str(o, "cmd", "media_url", "url"))
+                          val id = str(o, "id")
+                          if (cmd.isBlank() && id.isBlank()) continue
+                          val c = episodeChannel(o, seriesId, seasonId, "", "", "", out.size)
+                          if (out.none { it.id == c.id }) { out.add(c); flat++ }
+                      }
+                      added += flat
+                  }
+                  return added
+              }
+
+              /** مطابقة الموسم المطلوب مع ما رجعه السرفر — نفس `isSameMacPortalSeason` بالحرف. */
+              fun isSameSeason(wantedSeasonId: String, returnedId: String, returnedSeasonId: String, returnedSeasonNumber: String): Boolean {
+                  if (wantedSeasonId.trim().isEmpty()) return true
+                  val wanted = wantedSeasonId.trim()
+                  if (wanted == returnedId) return true
+                  if (wanted == returnedSeasonId) return true
+                  if (wanted == returnedSeasonNumber) return true
+                  if (wanted.contains(":")) {
+                      val wNum = wanted.substring(wanted.lastIndexOf(":") + 1)
+                      if (wNum == returnedSeasonNumber) return true
+                      if (returnedId.endsWith(":$wNum")) return true
+                      if (returnedSeasonId.endsWith(":$wNum")) return true
+                  }
+                  if (returnedId.contains(":")) {
+                      val rNum = returnedId.substring(returnedId.lastIndexOf(":") + 1)
+                      if (wanted == rNum) return true
+                  }
+                  if (returnedSeasonId.contains(":")) {
+                      val rNum = returnedSeasonId.substring(returnedSeasonId.lastIndexOf(":") + 1)
+                      if (wanted == rNum) return true
+                  }
+                  return false
               }
 
               private fun episodeChannel(e: JSONObject, seriesId: String, seasonId: String, seasonName: String, genre: String, cover: String, i: Int): Channel {
@@ -4746,37 +4951,6 @@ jobs:
                   return c
               }
 
-              fun seasonEpisodes(seriesId: String, seasonId: String, out: MutableList<Channel>): Int {
-                  val enc = Uri.encode(seriesId)
-                  val urls = ArrayList<String>()
-                  if (seasonId.isNotBlank()) urls.add("type=series&action=get_ordered_list&movie_id=$enc&season_id=" + Uri.encode(seasonId) + "&p=1&detailed=1")
-                  if (seasonId.isNotBlank()) urls.add("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$seasonId") + "&p=1&detailed=1")
-                  if (seasonId.isNotBlank()) urls.add("type=vod&action=get_ordered_list&movie_id=" + enc + "&season_id=" + Uri.encode(seasonId) + "&p=1&detailed=1")
-                  urls.add("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$seriesId") + "&p=1&detailed=1")
-                  urls.add("type=vod&action=get_ordered_list&genre=" + enc + "&p=1&detailed=1&series_id=" + enc)
-                  for (u in urls) {
-                      val r = req(u) ?: continue
-                      val arr = itemsOf(r)
-                      if (arr.length() == 0) continue
-                      var n = 0
-                      for (i in 0 until arr.length()) {
-                          val o = arr.optJSONObject(i) ?: continue
-                          val eps = o.optJSONArray("series") ?: o.optJSONArray("episodes")
-                          if (eps != null && eps.length() > 0) {
-                              val sName = str(o, "name", "title").ifBlank { "موسم $seasonId" }
-                              val sId = str(o, "id", "season_id").ifBlank { seasonId }
-                              for (k in 0 until eps.length()) {
-                                  val e = eps.optJSONObject(k) ?: continue
-                                  out.add(episodeChannel(e, seriesId, sId, sName, "", "", out.size)); n++
-                              }
-                          } else {
-                              out.add(episodeChannel(o, seriesId, str(o, "season_id").ifBlank { seasonId }, "موسم $seasonId", "", "", out.size)); n++
-                          }
-                      }
-                      if (n > 0) return n
-                  }
-                  return 0
-              }
 
               // ----------------------------- التشغيل -----------------------------
 
@@ -6586,7 +6760,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.14 (code 814)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.15 (code 815)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
