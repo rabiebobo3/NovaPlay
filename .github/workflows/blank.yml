@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.20"
-      VERSION_CODE: "820"
+      VERSION_NAME: "8.21"
+      VERSION_CODE: "821"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 820)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.20")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 821)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.21")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -365,6 +365,16 @@ jobs:
           | **الصورة تلقائيًا** | الوضع يُختار من **أبعاد الفيديو نفسه** مع أبعاد شاشة هاتفك: فيديو 16:9 أو أعرض ⇒ يملأ الشاشة بلا أشرطة (قصّ خفيف في الجوانب)، وفيديو أضيق (4:3/عمودي) ⇒ ملاءمة كاملة بلا تكبير عنيف. يتغيّر مع كل حلقة/فلم لوحده |
           | **تشخيص** | إذا فشل رابط: يُكتب في **سجل الأعطال**: `[PLAY-FAIL] kind=… mid=… sid=… snum=… :: <آخر الطلبات>` |
           | **الفحص** | تصريف كامل 0 خطأ / 92 صنف • اختبارات: **56 ناجح / 0 فاشل** (منها: بوابة تقبل `season_num=1` فقط وترفض 501 ⇒ التشغيل ينجح) |
+
+          ## 8.21 — تشغيل ذاتي الإصلاح + ريموت وفوكس + بلا تجمّد
+
+          | النقطة | التفصيل |
+          |---|---|
+          | **الحلقة ما تشتغلش** | المشغّل دابا يبني **قائمة أوامر تشغيل** (مثل دالتك `loadAndPlayEpisode`: base64 فيه `season_num`=رقم الموسم + `&series=<الحلقة>`، ثم أمر البوابة، ثم أمر السيرفر، ثم أمر MAG) وينفّذها **واحدًا واحدًا حتى ينجح أحدها** — بدل ما يعتمد على محاولة واحدة |
+          | **لا تجمّد** | أول رابط فاشل (خطأ مشغّل أو ما بداش في 12 ثانية) يُستبدل بالموالي **تلقائيًا** بلا تدخّل؛ وإن فشلت الكل تظهر رسالة واضحة + سبب في سجل الأعطال |
+          | **الريموت والفوكس** | الفوكس ما يروحش للبحث: يبدأ على الشبكة، والأزرار كلها (أقسام، بطاقات، أزرار الشاشة الكاملة) قابلة للفوكس بالريموت |
+          | **الرجوع بالفوكس** | من الحلقة ⇒ فوكس على **الحلقات** • من الحلقات ⇒ فوكس على **الموسم** • من الموسم ⇒ فوكس على **المسلسل** • من الفلم ⇒ فوكس على **الفلم** • ومن الفلم رجوع ⇒ فوكس على **قسم الأقسام** |
+          | **الفحص** | تصريف كامل 0 خطأ / 95 صنف • اختبارات **59 ناجح / 0 فاشل** • وتصريف الكود من داخل ملف yml النهائي |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -1779,6 +1789,31 @@ jobs:
                   }
               }
 
+              /** (8.21) الفوكس مع الريموت: نُبعده عن البحث ونضعه على الشبكة/المنقّح. */
+              private fun focusGrid() {
+                  try {
+                      if (!isTvDevice()) return
+                      etSearch.isFocusable = false
+                      etSearch.isFocusableInTouchMode = false
+                      rvGrid.isFocusable = true
+                      rvGrid.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
+                      rvGrid.post { try { rvGrid.requestFocus() } catch (t: Throwable) {} }
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              /** يضع الفوكس على عنصر معيّن بعد التمرير إليه (للرجوع من المشغل/مستوى لأعلى). */
+              private fun focusOn(pos: Int) {
+                  try {
+                      val lm = rvGrid.layoutManager ?: return
+                      rvGrid.postDelayed({
+                          try {
+                              val v = lm.findViewByPosition(pos)
+                              if (v != null) v.requestFocus() else rvGrid.requestFocus()
+                          } catch (t: Throwable) {}
+                      }, 220)
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
               private fun initScreen() {
                   setContentView(R.layout.activity_grid)
                   goImmersive()
@@ -1814,6 +1849,7 @@ jobs:
                           }
                       } else finish()
                   } else build()
+                  focusGrid()
               }
 
               private fun lastProfile(): Profile? = try {
@@ -2232,7 +2268,12 @@ jobs:
                       markOn(seasonCh)
                       applyFilter(); rvCats.adapter = CatAdapter()
                       saveStateAt(null, 1)
+                      val pos = items.indexOfFirst {
+                          (lastPlayedUrl.isNotBlank() && it.url == lastPlayedUrl) ||
+                          (lastPlayedId.isNotBlank() && it.id == lastPlayedId && it.name == lastName)
+                      }
                       try { rvGrid.post { scrollToLast() } } catch (t: Throwable) {}
+                      if (pos >= 0) focusOn(pos)
                       return true
                   }
                   if (lvl >= 1 && saved.isNotEmpty() && saved.none { it.stype == "season" }) {
@@ -2244,7 +2285,12 @@ jobs:
                       markOn(seriesCh)
                       applyFilter(); rvCats.adapter = CatAdapter()
                       saveStateAt(null, 0)
+                      val pos = items.indexOfFirst {
+                          (lastPlayedUrl.isNotBlank() && it.url == lastPlayedUrl) ||
+                          (lastPlayedId.isNotBlank() && it.id == lastPlayedId && it.name == lastName)
+                      }
                       try { rvGrid.post { scrollToLast() } } catch (t: Throwable) {}
+                      if (pos >= 0) focusOn(pos)
                       return true
                   }
                   return false
@@ -2272,6 +2318,16 @@ jobs:
               private fun back() {
                   // رجوع هرمي: حلقات → مواسم → قائمة → خروج
                   if (upLevel()) return
+                  // (8.21) في قائمة الأفلام/المسلسلات: الرجوع يرجّع الفوكس لقسم الأقسام (يمين) قبل الخروج
+                  try {
+                      if (lvl == 0 && rvGrid.hasFocus() && rvCats.adapter != null) {
+                          rvCats.isFocusable = true
+                          rvCats.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
+                          rvCats.post { try { rvCats.requestFocus() } catch (t: Throwable) {} }
+                          toast("الأقسام — رجوع مرة أخرى للخروج")
+                          return
+                      }
+                  } catch (t: Throwable) { Crash.log(t) }
                   if (inEpisodes) {
                       inEpisodes = false
                       lvl = 0
@@ -2293,7 +2349,15 @@ jobs:
                       sp.put("ret_pending", "0")
                       if (pendingScroll) {
                           pendingScroll = false
-                          try { restoreReturn() } catch (t: Throwable) { Crash.log(t); try { rvGrid.post { scrollToLast() } } catch (e: Throwable) {} }
+                          try {
+                              restoreReturn()
+                              focusGrid()
+                              val i = items.indexOfFirst {
+                                  (lastPlayedUrl.isNotBlank() && it.url == lastPlayedUrl) ||
+                                  (lastPlayedId.isNotBlank() && it.id == lastPlayedId && it.name == lastName)
+                              }
+                              if (i >= 0) focusOn(i)
+                          } catch (t: Throwable) { Crash.log(t); try { rvGrid.post { scrollToLast() } } catch (e: Throwable) {} }
                       }
                   }
                   evRec = Events.register(this) { type, _ ->
@@ -2404,7 +2468,10 @@ jobs:
                           notifyDataSetChanged()
                           rvGrid.scrollToPosition(0)
                           maybeFillCat(g)
+                          focusGrid()
                       }
+                      h.itemView.isFocusable = true
+                      h.itemView.isClickable = true
                   }
               }
 
@@ -2481,6 +2548,11 @@ jobs:
               private var lastW = 0
               private var lastH = 0
               private var resumeAsk = 0L
+              /* v8.21: أوامر التشغيل — لو فشل رابط، نجرّب الموالي تلقائيًا (لا تجمّد ولا شاشة فارغة) */
+              private val queries = ArrayList<String>()
+              private var candIdx = 0
+              private var playStarted = false
+              private var startTask: Runnable? = null
               private var topBar: View? = null
               private var userSeeking = false
               private var listMode = "all"          // all | fav | recent | mine | lock | group
@@ -2563,6 +2635,16 @@ jobs:
                       sp.put("rm5", "1")
                   }
                   pv.controllerAutoShow = !tv                // (كان قبل bind() → استثناء يفتح شاشة المشغل = طيّاح التطبيق)
+                  // v8.21: مع الريموت لا نُدخل الفوكس في البحث — الفوكس يبدأ على قائمة القنوات
+                  try {
+                      etSearch.isFocusable = !tv
+                      etSearch.isFocusableInTouchMode = !tv
+                      if (tv) {
+                          rvChannels.isFocusable = true
+                          rvChannels.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
+                          rvChannels.post { try { rvChannels.requestFocus() } catch (t: Throwable) {} }
+                      }
+                  } catch (t: Throwable) { Crash.log(t) }
                   pv.controllerShowTimeoutMs = if (tv) 2600 else 4200
                   buildPlayer()
                   decodeChans(sp.s("favs"), favs)
@@ -2740,18 +2822,19 @@ jobs:
                       }
                       val cmd0 = url
                       pendingPlayer(c, full0, "جارٍ تجهيز رابط البوابة…")
-                      Loader.macPlayable(p, c.kind, cmd0, c.mid, c.sid, c.id, c.snum, c.group) { u ->
-                          if (mySeq != playSeq) return@macPlayable     // ضغط المستخدم على عنصر آخر
+                      Loader.macPlayQueries(p, c) { list ->
+                          if (mySeq != playSeq) return@macPlayQueries     // ضغط المستخدم على عنصر آخر
                           try {
                               busy(false, "")
-                              if (u.isBlank()) {
+                              queries.clear(); queries.addAll(list); candIdx = 0
+                              if (queries.isEmpty()) {
+                                  busy(false, "")
                                   val info = try { StalkerSession.get(p).lastEpsInfo } catch (t: Throwable) { "" }
-                                  if (info.isNotBlank()) Crash.note("PLAY-FAIL", "kind=${c.kind} mid=${c.mid} sid=${c.sid} snum=${c.snum} ep=${c.id} :: " + info.take(300))
+                                  if (info.isNotBlank()) Crash.note("PLAY-FAIL", "kind=${c.kind} mid=${c.mid} sid=${c.sid} snum=${c.snum} ep=${c.id} :: " + info.take(400))
                                   showPlayerError("البوابة لم تُرجع رابطًا لهذا العنصر\n" + Catalog.status.take(160))
-                                  return@macPlayable
+                                  return@macPlayQueries
                               }
-                              c.url = u
-                              startPlayback(c, u, full0)
+                              resolveAndPlay(p, c, full0, mySeq)
                           } catch (t: Throwable) {
                               try { busy(false, "") } catch (e: Throwable) {}
                               Crash.log(t)
@@ -2763,6 +2846,32 @@ jobs:
                   if (url.startsWith("rtmp") || url.startsWith("mms")) { openExternal(url); return }
                   if (url.isBlank()) { toast("لا يوجد رابط تشغيل لهذا العنصر"); return }
                   startPlayback(c, url, full0)
+              }
+
+              /**
+               * (8.21) ينفّذ الأمر الحالي؛ إن فشل ينتقل للموالي تلقائيًا حتى ينجح أحدها.
+               * هذا هو اللي يمنع التجمّد: كل أمر فاشل يُستبدل بلا تدخّل من المستخدم.
+               */
+              private fun resolveAndPlay(p: Profile, c: Channel, asFull: Boolean, mySeq: Int) {
+                  if (mySeq != playSeq) return
+                  if (candIdx >= queries.size) {
+                      busy(false, "")
+                      val info = try { StalkerSession.get(p).lastEpsInfo } catch (t: Throwable) { "" }
+                      if (info.isNotBlank()) Crash.note("PLAY-FAIL-ALL", "kind=${c.kind} mid=${c.mid} sid=${c.sid} snum=${c.snum} ep=${c.id} :: " + info.take(400))
+                      showPlayerError("فشلت كل محاولات التشغيل (${queries.size}) لهذا العنصر\n" + Catalog.status.take(140))
+                      return
+                  }
+                  val q = queries[candIdx]
+                  busy(true, "تجهيز رابط التشغيل (${candIdx + 1}/${queries.size})…")
+                  Loader.macResolveQuery(p, q) { u ->
+                      if (mySeq != playSeq) return@macResolveQuery
+                      if (u.isBlank()) { candIdx++; resolveAndPlay(p, c, asFull, mySeq) }
+                      else {
+                          busy(false, "")
+                          c.url = u
+                          startPlayback(c, u, asFull)
+                      }
+                  }
               }
 
               /** رابط قابل للتشغيل مباشرة (ليس أمر بوابة محلي ولا رابطًا نسبيًا). */
@@ -2853,6 +2962,8 @@ jobs:
                   p.prepare()
                   p.playWhenReady = true
                   if (full) { try { pvFull.player = p } catch (t: Throwable) { pv.player = p } } else pv.player = p
+                  playStarted = false
+                  armStartWatch()
                   if (!full) { dockBusy.visibility = View.VISIBLE; tvLoadPct.text = "0%" }
                   else { fullBusy.visibility = View.VISIBLE; tvFullPct.text = "0%" }
                   armWd()
@@ -3089,6 +3200,8 @@ jobs:
                       Player.STATE_READY -> {
                           dockBusy.visibility = View.GONE
                           fullBusy.visibility = View.GONE
+                          playStarted = true
+                          clearStartWatch()
                           clearWd()
                           retries = 0
                           val dur = p.duration
@@ -3147,6 +3260,9 @@ jobs:
 
               override fun onPlayerError(e: PlaybackException) {
                   val p = player ?: return
+                  clearStartWatch()
+                  // (8.21) فشل الرابط؟ نجرّب المرشّح الموالي فورًا (تشغيل ذاتي الإصلاح)
+                  if (candIdx + 1 < queries.size) { tryNextCand("المصدر فشل (" + e.errorCodeName + ")"); return }
                   retries++
                   val smartAlt = sp.b("smart_alt", true)
                   val canAlt = !usingAlt && smartAlt && (cur?.alt?.isNotBlank() == true) && cur?.alt != cur?.url
@@ -3215,6 +3331,45 @@ jobs:
               }
 
               /* ================================ الرقابة ================================ */
+
+              /**
+               * (8.21) مؤقّت بدء التشغيل: إذا ما بداش الفيديو في 12 ثانية ⇒ نجرب المرشّح الموالي تلقائيًا،
+               * وإذا ما بقاش مرشّح نعرض سبب الفشل. الغاية: المشغّل ما يتجمّدش على شاشة فاضية.
+               */
+              private fun armStartWatch() {
+                  startTask?.let { h.removeCallbacks(it) }
+                  val r = Runnable {
+                      if (isFinishing || isDestroyed) return@Runnable
+                      if (!playStarted) tryNextCand("تأخّر/فشل المصدر")
+                  }
+                  startTask = r
+                  h.postDelayed(r, 12_000)
+              }
+
+              private fun clearStartWatch() {
+                  startTask?.let { h.removeCallbacks(it) }
+                  startTask = null
+              }
+
+              /** يجرّب المرشّح الموالي؛ وإن انتهوا يعرض سببًا واضحًا (بلا تجمّد). */
+              private fun tryNextCand(why: String) {
+                  try {
+                      val c = cur ?: return
+                      val pr = Catalog.profile
+                      if (candIdx + 1 < queries.size && pr != null) {
+                          candIdx++
+                          toast("$why — تجربة مصدر بديل ($candIdx/${queries.size - 1})")
+                          busy(true, "تجهيز رابط بديل…")
+                          resolveAndPlay(pr, c, full, playSeq)
+                      } else {
+                          val info = if (pr == null) "" else try { StalkerSession.get(pr).lastEpsInfo } catch (t: Throwable) { "" }
+                          if (info.isNotBlank()) Crash.note("PLAY-FAIL-ALL", "kind=${c.kind} mid=${c.mid} sid=${c.sid} snum=${c.snum} ep=${c.id} :: " + info.take(400))
+                          showPlayerError("فشلت كل المصادر (${queries.size}) لهذا العنصر\n$why")
+                          tvWd.text = "فشل التشغيل — جرّب عنصرًا آخر أو أعد التحميل"
+                          wdBar.visibility = View.VISIBLE
+                      }
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
 
               private fun armWd() {
                   clearWd()
@@ -3753,6 +3908,12 @@ jobs:
                       val p = player ?: return@setOnClickListener
                       if (p.isPlaying) p.pause() else p.play()
                   }
+                  // v8.21: أزرار الشاشة الكاملة تستقبل الريموت (فوكس + OK)
+                  try {
+                      for (id in listOf(R.id.btn_full_play, R.id.btn_full_close, R.id.btn_full_pip, R.id.btn_full_cast)) {
+                          findViewById<View>(id)?.let { v -> v.isFocusable = true; v.isFocusableInTouchMode = true }
+                      }
+                  } catch (t: Throwable) { Crash.log(t) }
                   findViewById<Button>(R.id.btn_full_close).setOnClickListener {
                       if (fromGrid) { savePosNow(); finish() }        // «إغلاق» = رجوع للقسم بنفس الموضع
                       else toggleFull(false)
@@ -5742,72 +5903,92 @@ jobs:
                *   4) آخر حل: أمر يبدو مباشرًا (http/rtsp/udp/rtmp) → يُعاد كما هو.
                *   5) فشل الجميع → "" مع رسالة واضحة (بدل تشغيل شيء خاطئ).
                */
-              fun playable(kind: String, cmd: String, mid: String = "", sid: String = "",
-                           epId: String = "", snum: Int = 0, seasonName: String = ""): String {
-                  val c = cleanCmd(cmd)
+              /**
+               * (8.21) **أوامر** create_link الممكنة بالترتيب — بلا شبكة (تُبنى فورًا).
+               * المشغّل ينفّذ الواحد فالواحد حتى ينجح أحدها ⇒ لا تجمّد ولا شاشة فاضية.
+               */
+              fun playQueries(kind: String, cmd: String, mid: String = "", sid: String = "",
+                              epId: String = "", snum: Int = 0, seasonName: String = ""): ArrayList<String> {
+                  val out = ArrayList<String>()
+                  val c0 = cleanCmd(cmd)
+                  val isEp = kind == "episode"
 
-                  // (1) create_link بأمر البوابة — الأنسب أولًا لكل الأنواع
-                  if (c.isNotBlank()) {
-                      val order = if (kind == "live") arrayOf("itv", "vod", "series") else arrayOf("vod", "itv", "series")
-                      for (t in order) {
-                          val r = req("type=$t&action=create_link&cmd=" + Uri.encode(c) + "&js_price=0&forced_country=") ?: continue
-                          val u = done(urlFrom(r))
-                          if (u.isNotBlank()) return u
-                          val inner = innerCmd(r)
-                          if (inner.isNotBlank() && inner != c) {
-                              val r2 = req("type=$t&action=create_link&cmd=" + Uri.encode(inner) + "&js_price=0&forced_country=")
-                              if (r2 != null) {
-                                  val u2 = done(urlFrom(r2))
-                                  if (u2.isNotBlank()) return u2
-                              }
-                          }
-                      }
-                  }
-
-                  // (2) الحلقات: create_link بأمر base64 {"series_id","season_num","type":"series"}
-                  //     ثم &series=<معرّف الحلقة> — نفس دالة loadAndPlayEpisode في كود Java بالحرف.
-                  //     جرّب رقم الموسم المعلوم أولًا، ثم مفتاح السرفر (بعض البوابات تطلب معرّفها).
-                  if (kind == "episode" && (mid.isNotBlank() || epId.isNotBlank())) {
+                  if (isEp) {
+                      // (1) نفس دالة loadAndPlayEpisode: base64 {"series_id","season_num","type":"series"} + &series=<ep>
                       val nums = ArrayList<Int>()
                       if (snum > 0) nums.add(snum)
                       val fromName = Regex("(?i)(?:موسم|season)\\s*0*(\\d{1,3})").find(seasonName)?.groupValues?.get(1)?.toIntOrNull()
                       if (fromName != null && fromName > 0 && fromName != snum) nums.add(fromName)
-                      nums.add(0)                                   // 0 = استعمل مفتاح السرفر كما هو
+                      nums.add(0)                     // مفتاح السرفر كما هو
+                      if (nums.none { it == 1 }) nums.add(1)
+                      val msgSid = if (mid.isNotBlank()) mid else epId
                       for (n in nums) {
-                          val b64 = seriesCmd(if (mid.isNotBlank()) mid else epId, sid, n)
+                          val b64 = seriesCmd(msgSid, sid, n)
                           val ids = ArrayList<String>()
                           if (epId.isNotBlank()) ids.add(epId)
                           val numOnly = epId.filter { it.isDigit() }
                           if (numOnly.isNotBlank() && numOnly != epId) ids.add(numOnly)
-                          ids.add("")
-                          for (id in ids) for (t in arrayOf("vod", "series")) {
+                          val types = if (ids.isEmpty()) arrayOf("vod", "series") else arrayOf("vod", "series", "itv")
+                          for (id in (if (ids.isEmpty()) listOf("") else ids)) for (t in types) {
                               var q = "type=$t&action=create_link&cmd=" + Uri.encode(b64) + "&js_price=0&forced_country="
                               if (id.isNotBlank()) q += "&series=" + Uri.encode(id)
-                              val r = req(q)
-                              diagEps(q)
-                              if (r == null) continue
-                              val u = done(urlFrom(r))
-                              if (u.isNotBlank()) return u
+                              addQuery(out, q)
                           }
                       }
                   }
 
-                  // (3) الحلقات: نجلب الأمر من السيرفر ثم نعيد create_link
-                  if (kind == "episode") {
+                  // (2) الأمر الأصلي كما هو عبر create_link (نفس playStalkerMovie)
+                  if (c0.isNotBlank()) {
+                      val order = if (kind == "live") arrayOf("itv", "vod", "series") else arrayOf("vod", "itv", "series")
+                      for (t in order) addQuery(out, "type=$t&action=create_link&cmd=" + Uri.encode(c0) + "&js_price=0&forced_country=")
+                  }
+
+                  // (3) الحلقات بلا أمر: أمر السيرفر الفعلي (من الذاكرة أولًا)
+                  if (isEp && c0.isBlank()) {
                       val found = episodeCmd(if (mid.isNotBlank()) mid else epId, sid, epId)
-                      if (found.isNotBlank()) {
-                          for (t in arrayOf("vod", "series", "itv")) {
-                              val r = req("type=$t&action=create_link&cmd=" + Uri.encode(found) + "&js_price=0&forced_country=") ?: continue
-                              val u = done(urlFrom(r))
-                              if (u.isNotBlank()) return u
-                          }
+                      if (found.isNotBlank()) for (t in arrayOf("vod", "series", "itv")) {
+                          addQuery(out, "type=$t&action=create_link&cmd=" + Uri.encode(found) + "&js_price=0&forced_country=")
                       }
                   }
 
-                  // (4) أمر البوابة نفسه: لو كان رابطًا (حتى http://localhost/ch/12_) نصلّح المضيف ونشغّل
-                  if (c.startsWith("http://") || c.startsWith("https://") || c.startsWith("rtsp") ||
-                      c.startsWith("udp") || c.startsWith("rtmp") || c.startsWith("mms")) return done(c)
+                  // (4) آخر حل: أمر MAG من المعرّف
+                  val mag = Stalker.localCmd(if (isEp && epId.isNotBlank()) epId else if (mid.isNotBlank()) mid else c0)
+                  if (mag.isNotBlank() && mag != c0) for (t in arrayOf("vod", "itv", "series")) {
+                      addQuery(out, "type=$t&action=create_link&cmd=" + Uri.encode(mag) + "&js_price=0&forced_country=")
+                  }
+                  if (out.size > 24) { val cut = ArrayList(out.subList(0, 24)); return cut }
+                  return out
+              }
 
+              /** يُضيف أمرًا إن لم يكن مكرّرًا. */
+              private fun addQuery(out: ArrayList<String>, q: String) {
+                  if (q.isNotBlank() && !out.contains(q)) out.add(q)
+              }
+
+              /** يُنفّذ أمرًا واحدًا ويُرجع الرابط (أو "" عند الفشل). */
+              fun resolveQuery(q: String): String {
+                  return try {
+                      val r = req(q) ?: return ""
+                      diagEps(q)
+                      done(urlFrom(r))
+                  } catch (t: Throwable) { Crash.log(t); "" }
+              }
+
+              /**
+               * نفس playQueries لكن ينفّذ حتى أول رابط ينجح (للتوافق مع الاستدعاءات القديمة).
+               * المشغّل الكبير يستعمل playQueries + resolveQuery ليجرب واحدًا واحدًا بلا تجمّد.
+               */
+              fun playable(kind: String, cmd: String, mid: String = "", sid: String = "",
+                           epId: String = "", snum: Int = 0, seasonName: String = ""): String {
+                  val qs = playQueries(kind, cmd, mid, sid, epId, snum, seasonName)
+                  for (q in qs) {
+                      val u = resolveQuery(q)
+                      if (u.isNotBlank()) return u
+                  }
+                  // آخر حل: لو كان الأمر نفسه رابطًا كاملًا نصلّح المضيف ونشغّل
+                  val c = cleanCmd(cmd)
+                  if (c.startsWith("http://") || c.startsWith("https://") || c.startsWith("rtsp://") ||
+                      c.startsWith("udp://") || c.startsWith("rtmp") || c.startsWith("mms")) return done(c)
                   lastError = "البوابة رفضت إنشاء رابط تشغيل لهذا العنصر (create_link)"
                   return ""
               }
@@ -6315,6 +6496,32 @@ jobs:
                           val st = StalkerSession.get(p)
                           if (st.connect()) u = st.playable(kind, cmd0, mid, sid, epId, snum, seasonName)
                           else Catalog.status = st.lastError
+                      } catch (t: Throwable) { Crash.log(t) }
+                      val fu = u
+                      Bg.ui { cb(fu) }
+                  }
+              }
+
+              /** (8.21) أوامر التشغيل الممكنة (بلا شبكة) — المشغّل ينفّذها واحدًا واحدًا حتى ينجح أحدها. */
+              fun macPlayQueries(p: Profile, c: Channel, cb: (ArrayList<String>) -> Unit) {
+                  Bg.pool.execute {
+                      val out = ArrayList<String>()
+                      try {
+                          val st = StalkerSession.get(p)
+                          if (st.connect()) out.addAll(st.playQueries(c.kind, c.url, c.mid, c.sid, c.id, c.snum, c.group))
+                          else Catalog.status = st.lastError
+                      } catch (t: Throwable) { Crash.log(t) }
+                      Bg.ui { cb(out) }
+                  }
+              }
+
+              /** (8.21) يُنفّذ أمرًا واحدًا ويُرجع الرابط ("" عند الفشل). */
+              fun macResolveQuery(p: Profile, q: String, cb: (String) -> Unit) {
+                  Bg.pool.execute {
+                      var u = ""
+                      try {
+                          val st = StalkerSession.get(p)
+                          if (st.connect()) u = st.resolveQuery(q) else Catalog.status = st.lastError
                       } catch (t: Throwable) { Crash.log(t) }
                       val fu = u
                       Bg.ui { cb(fu) }
@@ -7523,7 +7730,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.20 (code 820)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.21 (code 821)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
