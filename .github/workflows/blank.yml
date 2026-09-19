@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.9"
-      VERSION_CODE: "89"
+      VERSION_NAME: "8.10"
+      VERSION_CODE: "810"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 89)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.9")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 810)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.10")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -256,6 +256,17 @@ jobs:
           | ضغط القناة/الفلم | أمر البوابة `http://localhost/ch/N_` للمشغل مباشرة | (من 8.8) `create_link` ثم `fixHost()` + حماية كل مسارات الضغط |
 
           **مهم بعد التثبيت:** اضغط «إعادة تحميل البوابة» مرّة واحدة (الكاش القديم `pl/` يُحذف تلقائيًا ويستعمل `pl2/`).
+
+          ## 8.10 — مسار التشغيل مطابق لكود Java (المشغل يظهر دائمًا)
+
+          | في كود Java المجرَّب | في هذا الكود (نفس السلوك) |
+          |---|---|
+          | `playStalkerMovie`: `create_link&cmd=...` ثم `extractUrlFromResponse` ثم التشغيل | `Stalker.playable("movie"\|"live"\|"episode", cmd)` → `create_link` → `urlFrom()` |
+          | فشل create_link → يشغّل `cmd` الأصلي | `done()` → الرابط كما هو، ومع `localhost` → `fixHost()` لمضيف البوابة |
+          | `playStalkerEpisode`: base64 `{series_id, season_num, type:series}` + `&series=<ep>` | نفس المسار في `playable()` قبل أي محاولة أخرى |
+          | عنصر بلا `cmd`؟ | نبني أمر جهاز MAG `http://localhost/ch/<id>_` من المعرّف ثم `create_link` (قناة/فلم/حلقة) |
+          | الضغط → `actuallyPlayChannel` → المشغل يظهر ويشتغل | `play()` تفتح شاشة المشغل **فورًا** (`pendingPlayer`) ثم تُسند الرابط؛ الفشل يظهر **داخل المشغل** (`showPlayerError`) لا خروج |
+          | ترويسات التشغيل: Cookie + Referer + UA + `Authorization: Bearer <token>` | `Stalker.playHeaders()` في `buildPlayer` (media3) |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -1859,7 +1870,14 @@ jobs:
                       }
                       return
                   }
-                  if (c.url.isBlank() && c.alt.isBlank()) { toast("لا يوجد رابط لهذا العنصر"); return }
+                  if (c.url.isBlank() && c.alt.isBlank()) {
+                      val p2 = Catalog.profile
+                      if (p2?.type == "mac" && (c.id.isNotBlank() || c.mid.isNotBlank())) {
+                          if (c.url.isBlank()) c.url = Stalker.localCmd(c.id.ifBlank { c.mid })   // أمر MAG من المعرّف
+                          playNow(c); return
+                      }
+                      toast("لا يوجد رابط لهذا العنصر"); return
+                  }
                   playNow(c)
               }
 
@@ -1875,6 +1893,7 @@ jobs:
               private fun playNow(c: Channel) {
                   val i = Intent(this, LiveActivity::class.java)
                   i.putExtra("play", if (c.url.isNotBlank()) c.url else c.alt)
+                  i.putExtra("cid", c.id)
                   i.putExtra("title", c.name)
                   i.putExtra("kind", c.kind.ifBlank { if (kind == "movie") "movie" else "series" })
                   i.putExtra("chan", c.toJson().toString())
@@ -2149,8 +2168,9 @@ jobs:
                   selectGroup(groups.firstOrNull() ?: Group().apply { name = "ALL"; special = "all" })
                   setupCast()
                   val direct = intent.getStringExtra("play")
-                  if (!direct.isNullOrBlank()) {
-                      playSafe(chanFromIntent(direct), true)
+                  val chanExtra = intent.getStringExtra("chan")
+                  if (!direct.isNullOrBlank() || !chanExtra.isNullOrBlank()) {
+                      playSafe(chanFromIntent(direct ?: ""), true)
                   } else if (!Catalog.loaded) {
                       val p = Catalog.profile ?: lastProfile()
                       if (p != null) {
@@ -2192,9 +2212,10 @@ jobs:
                   super.onNewIntent(i)
                   intent = i
                   val direct = i?.getStringExtra("play")
-                  if (!direct.isNullOrBlank()) {
+                  val chanExtra = i?.getStringExtra("chan")
+                  if (!direct.isNullOrBlank() || !chanExtra.isNullOrBlank()) {
                       showPip(false)
-                      playSafe(chanFromIntent(direct), true)
+                      playSafe(chanFromIntent(direct ?: ""), true)
                   }
               }
 
@@ -2226,6 +2247,7 @@ jobs:
                   return Channel().apply {
                       name = intent.getStringExtra("title") ?: "تشغيل"
                       this.url = url
+                      id = intent.getStringExtra("cid") ?: ""
                       kind = intent.getStringExtra("kind") ?: "movie"
                   }
               }
@@ -2288,34 +2310,64 @@ jobs:
                   retries = 0
                   usingAlt = false
                   pushRecent(c)
-                  val url = c.url.ifBlank { c.alt }
-                  if (url.startsWith("rtmp") || url.startsWith("mms")) { openExternal(url); return }
+                  var url = c.url.ifBlank { c.alt }
                   val p = Catalog.profile
-                  // MAC: كل تشغيل يمرّ عبر البوابة (create_link) — حتى لو كان الأمر يبدو رابطًا كاملًا،
-                  // لأن أوامر كثير من البوابات تكون مثل http://localhost/ch/12_ ولا تعمل بلا create_link.
+                  // MAC: كل تشغيل يمرّ عبر البوابة (create_link). المشغل يظهر فورًا، ثم يُجلب الرابط،
+                  // ولو فشلت البوابة يظهر سبب الفشل داخل المشغل نفسه (لا يخرج المستخدم).
                   if (p?.type == "mac") {
+                      if (url.isBlank()) url = Stalker.localCmd(c.id.ifBlank { c.mid })   // أمر MAG من المعرّف
                       if (url.isBlank()) { toast("لا يوجد أمر تشغيل لهذا العنصر"); return }
-                      busy(true, "تجهيز رابط البوابة…")
-                      Loader.macPlayable(p, c.kind, url, c.mid, c.sid, c.id) { u ->
+                      val cmd0 = url
+                      pendingPlayer(c, full0, "جارٍ تجهيز رابط البوابة…")
+                      Loader.macPlayable(p, c.kind, cmd0, c.mid, c.sid, c.id) { u ->
                           if (mySeq != playSeq) return@macPlayable     // ضغط المستخدم على عنصر آخر
                           try {
                               busy(false, "")
-                              val fin = if (u.startsWith("http") || u.startsWith("rtsp") || u.startsWith("udp")) u
-                                        else if (u.startsWith("rtmp") || u.startsWith("mms")) { openExternal(u); "" }
-                                        else u
-                              if (fin.isBlank()) { toast("البوابة لم تُرجع رابطًا صالحًا"); return@macPlayable }
-                              c.url = fin
-                              startPlayback(c, fin, full0)
+                              if (u.isBlank()) {
+                                  showPlayerError("البوابة لم تُرجع رابطًا لهذا العنصر\n" + Catalog.status.take(160))
+                                  return@macPlayable
+                              }
+                              c.url = u
+                              startPlayback(c, u, full0)
                           } catch (t: Throwable) {
                               try { busy(false, "") } catch (e: Throwable) {}
                               Crash.log(t)
-                              toast("تعذر التشغيل: " + (t.message ?: t.javaClass.simpleName))
+                              showPlayerError("تعذر التشغيل: " + (t.message ?: t.javaClass.simpleName))
                           }
                       }
                       return
                   }
+                  if (url.startsWith("rtmp") || url.startsWith("mms")) { openExternal(url); return }
                   if (url.isBlank()) { toast("لا يوجد رابط تشغيل لهذا العنصر"); return }
                   startPlayback(c, url, full0)
+              }
+
+              /** يفتح شاشة المشغل فورًا (عنوان + شريط تحميل) قبل ما يوصل الرابط. */
+              private fun pendingPlayer(c: Channel, asFull: Boolean, msg: String) {
+                  try {
+                      infoName.text = c.name
+                      infoSub.text = listOfNotNull(
+                          if (c.group.isBlank()) null else c.group,
+                          when (c.kind) { "live" -> "بث مباشر"; "movie" -> "فيلم"; "series" -> "مسلسل"; "episode" -> "حلقة"; else -> c.kind }
+                      ).joinToString(" • ")
+                      infoDesc.text = c.extra.ifBlank { "بانتظار البيانات…" }
+                      if (asFull && !full) toggleFull(true)
+                      dockBusy.visibility = View.VISIBLE; fullBusy.visibility = View.VISIBLE
+                      tvLoadTxt.text = msg; tvFullPct.text = ""; tvLoadPct.text = ""
+                      wdBar.visibility = View.GONE
+                      chanAdapter.notifyDataSetChanged()
+                      showPip(true)
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              /** رسالة الفشل تظهر داخل المشغل (الشريط العلوي) بدل ما يخرج المستخدم أو ما يشوفش شي. */
+              private fun showPlayerError(msg: String) {
+                  try {
+                      dockBusy.visibility = View.GONE; fullBusy.visibility = View.GONE
+                      tvWd.text = msg
+                      wdBar.visibility = View.VISIBLE
+                      infoDesc.text = msg
+                  } catch (t: Throwable) { Crash.log(t) }
               }
 
               /** غلاف آمن للضغط على القناة: أي خطأ يظهر كتنبيه ولا يُغلق التطبيق. */
@@ -4025,6 +4077,12 @@ jobs:
                       return m.groupValues[1] + path
                   }
 
+                  /** أمر محلي قياسي عندما لا ترسل البوابة cmd: http://localhost/ch/<id>_ (نفس ما يبنيه MAG) */
+                  fun localCmd(id: String): String {
+                      val n = id.substringBefore(":").replace(Regex("\\D"), "")
+                      return if (n.isBlank()) "" else "http://localhost/ch/" + n + "_"
+                  }
+
                   /**
                    * ترويسات البوابة وقت التشغيل (media3) — تشمل التوكن المحفوظ إن وُجد،
                    * لأن كثيرًا من البوابات ترفض الجلب بدونه.
@@ -4178,12 +4236,6 @@ jobs:
                   c = c.replace("\\/", "/").replace("\\u0026", "&").trim()
                   while (c.startsWith("ffmpeg")) c = c.substring(6).trim()
                   return c
-              }
-
-              /** أمر محلي قياسي عندما لا ترسل البوابة cmd: http://localhost/ch/<id>_ (نفس ما يبنيه MAG) */
-              fun localCmd(id: String): String {
-                  val n = id.substringBefore(":").replace(Regex("\\D"), "")
-                  return if (n.isBlank()) "" else "http://localhost/ch/" + n + "_"
               }
 
               /** يكمل الرابط النسبي بأصل البوابة. */
@@ -4349,6 +4401,8 @@ jobs:
                   c.name = str(o, "name", "title")
                   c.id = str(o, "id", "movie_id", "series_id", "value_id")
                   c.url = cleanCmd(str(o, "cmd", "media_url", "url"))
+                  // بوابات كثيرة ما ترسلش cmd للأفلام/المسلسلات → نبني أمر جهاز MAG: http://localhost/ch/<id>_
+                  if (c.url.isBlank() && c.id.isNotBlank()) c.url = localCmd(c.id)
                   c.logo = str(o, "screenshot_uri", "cover", "screenshot", "backdrop_path", "movie_image")
                   c.catId = catId
                   c.group = if (catName.isNotBlank()) catName else str(o, "category_name", "genres", "category_id").ifBlank { "عام" }
@@ -5190,8 +5244,11 @@ jobs:
                   Bg.pool.execute {
                       var u = ""
                       try {
+                          // أمر البوابة فارغ؟ نبنيه من المعرّف بصيغة MAG (http://localhost/ch/<id>_) ثم create_link
+                          var cmd0 = cmd
+                          if (cmd0.isBlank()) cmd0 = Stalker.localCmd(if (epId.isNotBlank()) epId else if (mid.isNotBlank()) mid else "")
                           val st = StalkerSession.get(p)
-                          if (st.connect()) u = st.playable(kind, cmd, mid, sid, epId)
+                          if (st.connect()) u = st.playable(kind, cmd0, mid, sid, epId)
                           else Catalog.status = st.lastError
                       } catch (t: Throwable) { Crash.log(t) }
                       val fu = u
@@ -6401,7 +6458,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.9 (code 89)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.10 (code 810)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
