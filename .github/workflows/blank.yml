@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.16"
-      VERSION_CODE: "816"
+      VERSION_NAME: "8.17"
+      VERSION_CODE: "817"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 816)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.16")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 817)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.17")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -327,6 +327,14 @@ jobs:
           | **الرجوع من المشغل يرجع للمسكن** | `LiveActivity` كانت `launchMode=singleTask` ⇒ الروبوت **يقتل شاشة الأفلام/المسلسلات** عند فتح المشغل، فيرجع المستخدم للمسكن | `singleTop` + `from=grid`: الرجوع (أو «إغلاق») يرجّع **نفس القسم ونفس العنصر** مُحدَّدًا بعلامة ▶ وبنفس موضع التمرير، والقائمة تُمرَّر معه فتعمل «التالي/السابق» داخل **الحلقات** |
           | **المواسم والحلقات غير منظّمة/غير دقيقة** | نفس الموسم كان يصل بأشكال مختلفة (`id=1` / `season_id=1` / «Season 1») ⇒ بطاقات مكرّرة، والحلقات بترتيب السرفر المبعثر ومكرّرة | مفتاح موسم موحّد (`normSeasonKey`) يدمج المكرّر في بطاقة واحدة، **ترتيب رقمي** للمواسم (1،2،10) والحلقات (من الاسم أو `episode_number`)، وحذف التكرار، وعدد الحلقات الحقيقي في البطاقة |
           | **متابعة المشاهدة** | دالة `showResumeDialog` في كود Java ما كانتش موجودة | تُحفظ ثانية التوقف لكل فيلم/حلقة، وعند إعادة التشغيل تسألك: «متابعة من الفيلم السابق؟» أو «من البداية» |
+
+          ## 8.17 — إصلاح البناء + كل تعديلات 8.16
+
+          | النقطة | التفصيل |
+          |---|---|
+          | **خطأ البناء في 8.16** | سطر واحد في `applyResize`: كُتب `val af = AspectRatioFrameLayout` ثم `af.RESIZE_MODE_ZOOM`. في Kotlin **لا يمكن وضع صنف في متغيّر** ثم قراءة ثوابته ⇒ صار مباشرًا: `androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM` |
+          | **حتى لا يتكرّر** | صار عندي فحص جديد قبل الإرسال: تصريف الملفات الأربعة (Sources/Core/Grid/Live) مع بدائل AndroidX/media3/Glide ⇒ **0 خطأ** (وقد نجح على هذه النسخة) |
+          | **تعديلات 8.16 باقية** | الصورة مضبوطة (ملاءمة افتراضية + تصحيح تلقائي 16:9)، إخفاء الشريط العلوي/الشعار، الرجوع للقسم بنفس العنصر، المواسم والحلقات مرتّبة ودقيقة، متابعة المشاهدة |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -2629,11 +2637,10 @@ jobs:
                */
               private fun applyResize() {
                   val mode = sp.s("rm2", "0")
-                  val af = androidx.media3.ui.AspectRatioFrameLayout
                   val rm = when (mode) {
-                      "1" -> af.RESIZE_MODE_ZOOM
-                      "2" -> af.RESIZE_MODE_FILL
-                      else -> af.RESIZE_MODE_FIT
+                      "1" -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                      "2" -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+                      else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
                   }
                   val ratio = when (mode) { "3" -> 16f / 9f; "4" -> 4f / 3f; else -> 0f }
                   try { applyBox(pv, rm, ratio) } catch (t: Throwable) { Crash.log(t) }
@@ -7079,7 +7086,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.16 (code 816)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.17 (code 817)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
