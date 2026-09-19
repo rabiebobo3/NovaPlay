@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.7"
-      VERSION_CODE: "87"
+      VERSION_NAME: "8.8"
+      VERSION_CODE: "88"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 87)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.7")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 88)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.8")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -235,6 +235,16 @@ jobs:
           **ملاحظة مهمة**: في بوابات MAC الأمر المخزّن في القائمة ليس رابطًا؛ لذلك كل تشغيل يمرّ بـ `create_link`
           (وظيفة `Loader.macPlayable`) — وهذا هو سبب «الأقسام تظهر والتشغيل لا يعمل» قبل هذه النسخة.
 
+
+          ## 8.8 — فتح سريع + جلب **كل** محتوى السيرفر (كل الأقسام بكل صفحاتها)
+
+          | المشكلة القديمة | الحل في 8.8 |
+          |---|---|
+          | التطبيق يطول 5 دقائق ويجيبهش البيانات | المسار السريع: مصافحة + الأقسام + القنوات فقط (**ثوانٍ**) ثم الأفلام والمسلسلات تُجلب **في الخلفية** والعناصر تظهر تباعًا بلا تجميد |
+          | كل قسم يجيب 14 عنصر فقط (صفحة واحدة) | كان لا يقرأ `total_pages` من البوابة → يتوقف بعد الصفحة الأولى. الآن يقرأها (وإن غابت يكمل ما دامت الصفحة ممتلئة: `page++ while len>=14` مثل كود Java) حتى **آخر صفحة** |
+          | المسلسلات لا تُجلب أبدًا | صارت في نفس مسار الجلب (خلفي + عند فتح القسم) وتظهر كاملة |
+          | الضغط على قناة/فلم يُخرج التطبيق | `create_link` لكل عنصر MAC + أمر البوابة المحلي `http://localhost/ch/N_` يُصلَّح إلى مضيف البوابة (مثل جهاز MAG) + كل مسارات الضغط محميّة (تنبيه بدل خروج) |
+          | القسم يُجلب مرة واحدة فقط | كل قسم يُوسم «مكتمل» (`Catalog.fillDone`) — يُجلب كاملًا مرة واحدة ثم يُقرأ من الذاكرة |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -1602,6 +1612,7 @@ jobs:
               private var inEpisodes = false
               private var seriesName = ""
               private var macLocal = false
+              private var evRec: android.content.BroadcastReceiver? = null
               private val saved = ArrayList<Channel>()
               private val favs = ArrayList<Channel>()
 
@@ -1696,16 +1707,30 @@ jobs:
                       " (${items.size})"
               }
 
+              /** تحديث خفيف أثناء الجلب الخلفي: يحدّث العدّادات والعناصر مع الحفاظ على القسم المختار. */
+              private fun softRefresh() {
+                  if (inEpisodes) return
+                  val keep = selCat
+                  all.clear()
+                  all.addAll(if (kind == "movie") Catalog.movie else Catalog.series)
+                  val byCat = HashMap<String, Int>()
+                  for (c in all) if (c.catId.isNotBlank()) byCat[c.catId] = (byCat[c.catId] ?: 0) + 1
+                  for (g in cats) if (g.catId.isNotBlank()) g.count = byCat[g.catId] ?: 0
+                  if (cats.isNotEmpty()) cats[0].count = all.size
+                  selCat = keep
+                  applyFilter()
+                  try { rvCats.adapter?.notifyDataSetChanged() } catch (t: Throwable) {}
+              }
+
               /** لو القسم فاضي في الذاكرة (بوابة MAC): نجلبه من السيرفر فورًا ونضيفه محليًا. */
               private fun maybeFillCat(g: Group) {
                   val p = Catalog.profile
                   if (!macLocal || inEpisodes || p?.type != "mac") return
                   if (g.catId.isBlank() || g.special == "all" || g.special == "recent") return
                   val cat = if (kind == "movie") Catalog.movie else Catalog.series
-                  var have = 0
-                  for (c in cat) if (c.catId == g.catId) have++
-                  if (have >= Stalker.PAGE_MIN) return
-                  showBusy(true, "جلب «" + g.name + "» من السيرفر…")
+                  // القسم يُجلب كاملًا مرة واحدة (كل الصفحات)؛ ولا نعيد جلبه إذا كان مكتملًا أو جاريًا
+                  if (Catalog.fillDone(kind, g.catId) || Catalog.fillBusy(kind, g.catId)) return
+                  showBusy(true, "جلب «" + g.name + "» بكل صفحاته…")
                   val out = ArrayList<Channel>()
                   Loader.macFillCat(this, p, kind, g.catId, g.name, out) { n ->
                       try {
@@ -1844,6 +1869,16 @@ jobs:
               override fun onResume() {
                   super.onResume()
                   goImmersive()
+                  evRec = Events.register(this) { type, _ ->
+                      if (type == "catalog") runOnUiThread {
+                          try { softRefresh() } catch (t: Throwable) { Crash.log(t) }
+                      }
+                  }
+              }
+
+              override fun onPause() {
+                  Events.unregister(this, evRec); evRec = null
+                  super.onPause()
               }
 
               override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -2214,7 +2249,12 @@ jobs:
                   } catch (t: Throwable) { Crash.log(t) }
               }
 
-              private fun play(c: Channel, asFull: Boolean) {
+              /** رقم آخر ضغطة: أي رد قديم (قناة سابقة) لا يقطع تشغيل ما ضغط عليه المستخدم للتو. */
+              private var playSeq = 0
+
+              private fun play(c: Channel, full0: Boolean) {
+                  playSeq++
+                  val mySeq = playSeq
                   stopAllPlayback()
                   cur = c
                   retries = 0
@@ -2229,6 +2269,7 @@ jobs:
                       if (url.isBlank()) { toast("لا يوجد أمر تشغيل لهذا العنصر"); return }
                       busy(true, "تجهيز رابط البوابة…")
                       Loader.macPlayable(p, c.kind, url, c.mid, c.sid, c.id) { u ->
+                          if (mySeq != playSeq) return@macPlayable     // ضغط المستخدم على عنصر آخر
                           try {
                               busy(false, "")
                               val fin = if (u.startsWith("http") || u.startsWith("rtsp") || u.startsWith("udp")) u
@@ -2236,7 +2277,7 @@ jobs:
                                         else u
                               if (fin.isBlank()) { toast("البوابة لم تُرجع رابطًا صالحًا"); return@macPlayable }
                               c.url = fin
-                              startPlayback(c, fin, asFull)
+                              startPlayback(c, fin, full0)
                           } catch (t: Throwable) {
                               try { busy(false, "") } catch (e: Throwable) {}
                               Crash.log(t)
@@ -2246,7 +2287,7 @@ jobs:
                       return
                   }
                   if (url.isBlank()) { toast("لا يوجد رابط تشغيل لهذا العنصر"); return }
-                  startPlayback(c, url, asFull)
+                  startPlayback(c, url, full0)
               }
 
               /** غلاف آمن للضغط على القناة: أي خطأ يظهر كتنبيه ولا يُغلق التطبيق. */
@@ -3469,6 +3510,8 @@ jobs:
                           startSessionWatch()
                           if (msg.contains("كاش")) tvHomeStatus.text = msg
                           toast("جاهز: ${Catalog.live.size} قناة • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل")
+                          // الجلب الخلفي (كل الأقسام بكل صفحاتها) — نعرض تقدّمه هنا ويُحدَّث كل 1.2 ثانية
+                          if (Catalog.bgRun) { bgWasRun = true; h.removeCallbacks(bgTick); h.postDelayed(bgTick, 1200) }
                       } else {
                           toast(msg.ifBlank { "تعذّر التحميل" })
                           wdBar.visibility = View.VISIBLE
@@ -3478,6 +3521,24 @@ jobs:
               }
 
               /* ------------------------------ الرقابة ------------------------------ */
+
+              private var bgWasRun = false
+
+              /** مؤقّت خفيف: يعرض «جلب المحتوى… n/m قسم» أثناء الجلب الخلفي ثم النتيجة النهائية. */
+              private val bgTick = object : Runnable {
+                  override fun run() {
+                      try {
+                          if (Catalog.bgRun) {
+                              tvHomeStatus.text = "جلب المحتوى… " + Catalog.bgMsg
+                              h.postDelayed(this, 1200)
+                          } else if (bgWasRun) {
+                              bgWasRun = false
+                              tvHomeStatus.text = "${Catalog.live.size + Catalog.movie.size + Catalog.series.size} عنصر • ${Catalog.status}"
+                              toast("اكتمل الجلب: ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل")
+                          }
+                      } catch (t: Throwable) { Crash.log(t) }
+                  }
+              }
 
               private fun armWatchdog() {
                   disarmWatchdog()
@@ -4059,8 +4120,17 @@ jobs:
                       is String -> tp.toIntOrNull() ?: n
                       else -> n
                   }
+                  if (n == 1) n = maxOf(o.optInt("total_pages", 1), n)          // صيغة Stalker الشائعة
                   if (n == 1) n = maxOf(o.optJSONObject("total")?.optInt("pages", 1) ?: 1, n)
                   if (n == 1) n = maxOf(o.optInt("pages", 1), 1)
+                  if (n == 1) {                                                   // لو ما أرسلتش عدد الصفحات: نحسبها
+                      var total = o.optInt("total_items", 0)
+                      if (total == 0) total = o.optInt("total", 0)
+                      var per = o.optInt("per_page", 0)
+                      if (per == 0) per = o.optInt("max_page_items", 0)
+                      if (per == 0 && total > 0) per = PAGE_MIN
+                      if (total > 0 && per > 0) n = maxOf(1, (total + per - 1) / per)
+                  }
                   return if (n < 1) 1 else n
               }
 
@@ -4283,7 +4353,7 @@ jobs:
                                   }
                                   val pages = pagesOf(first)
                                   var p = 2
-                                  while (arr.length() >= PAGE_MIN && p <= minOf(pages, maxPages) &&
+                                  while (arr.length() >= PAGE_MIN && (p <= pages || pages <= 1) && p <= maxPages &&
                                       totN.get() < MAX_ITEMS && System.currentTimeMillis() < deadline) {
                                       val r2 = page(type, g.catId, p, "") ?: break
                                       val a2 = itemsOf(r2)
@@ -4313,12 +4383,16 @@ jobs:
                   return out.size
               }
 
+              /**
+               * يجلب **كل** صفحات قسم: نتبع عدد الصفحات إن أرسلته البوابة، وإلا نكمل ما دامت
+               * الصفحة ممتلئة (نفس منطق «page++ while len >= 14» في كود Java) حتى آخر صفحة.
+               */
               fun fillCat(kind: String, genreId: String, catName: String, maxPages: Int, out: MutableList<Channel>): Int {
                   val type = if (kind == "movie") "vod" else "series"
                   var p = 1
-                  var pages = 1
+                  var pages = 0
                   var added = 0
-                  while (p <= pages && p <= maxPages) {
+                  while (p <= maxPages) {
                       val r = page(type, genreId, p, "") ?: break
                       val arr = itemsOf(r)
                       if (arr.length() == 0) break
@@ -4327,9 +4401,11 @@ jobs:
                           val c = toChannel(o, kind, catName, genreId, out.size + 1)
                           if (c.kind == "series") c.mid = c.id
                           out.add(c); added++
+                          if (out.size >= MAX_ITEMS) return added
                       }
-                      if (p == 1) pages = pagesOf(r)
-                      if (arr.length() < PAGE_MIN) break
+                      if (pages == 0) pages = pagesOf(r)               // عدد الصفحات (إن وُجد)
+                      if (arr.length() < PAGE_MIN) break               // صفحة ناقصة = آخر صفحة
+                      if (pages > 0 && p >= pages) break               // وصلنا للعدد المُعلن
                       p++
                   }
                   return added
@@ -4544,13 +4620,13 @@ jobs:
                       val order = if (kind == "live") arrayOf("itv", "vod", "series") else arrayOf("vod", "itv", "series")
                       for (t in order) {
                           val r = req("type=$t&action=create_link&cmd=" + Uri.encode(c) + "&js_price=0&forced_country=") ?: continue
-                          val u = urlFrom(r)
+                          val u = done(urlFrom(r))
                           if (u.isNotBlank()) return u
                           val inner = innerCmd(r)
                           if (inner.isNotBlank() && inner != c) {
                               val r2 = req("type=$t&action=create_link&cmd=" + Uri.encode(inner) + "&js_price=0&forced_country=")
                               if (r2 != null) {
-                                  val u2 = urlFrom(r2)
+                                  val u2 = done(urlFrom(r2))
                                   if (u2.isNotBlank()) return u2
                               }
                           }
@@ -4567,7 +4643,7 @@ jobs:
                           var q = "type=vod&action=create_link&cmd=" + Uri.encode(b64) + "&js_price=0&forced_country="
                           if (id.isNotBlank()) q += "&series=" + Uri.encode(id)
                           val r = req(q) ?: continue
-                          val u = urlFrom(r)
+                          val u = done(urlFrom(r))
                           if (u.isNotBlank()) return u
                       }
                   }
@@ -4578,25 +4654,46 @@ jobs:
                       if (found.isNotBlank()) {
                           for (t in arrayOf("vod", "series", "itv")) {
                               val r = req("type=$t&action=create_link&cmd=" + Uri.encode(found) + "&js_price=0&forced_country=") ?: continue
-                              val u = urlFrom(r)
+                              val u = done(urlFrom(r))
                               if (u.isNotBlank()) return u
                           }
                       }
                   }
 
-                  // (4) رابط يبدو مباشرًا فعلًا
+                  // (4) أمر البوابة نفسه: لو كان رابطًا (حتى http://localhost/ch/12_) نصلّح المضيف ونشغّل
                   if (c.startsWith("http://") || c.startsWith("https://") || c.startsWith("rtsp") ||
-                      c.startsWith("udp") || c.startsWith("rtmp") || c.startsWith("mms")) return c
+                      c.startsWith("udp") || c.startsWith("rtmp") || c.startsWith("mms")) return done(c)
 
                   lastError = "البوابة رفضت إنشاء رابط تشغيل لهذا العنصر (create_link)"
                   return ""
               }
 
+              /**
+               * أوامر بعض البوابات تكون `http://localhost/ch/12_` (نفس ما يبنيه جهاز MAG)،
+               * فلا تشتغل على الهاتف. نستبدل المضيف بأصل البوابة كما يفعل الجهاز الأصلي.
+               */
+              fun fixHost(u: String): String {
+                  if (u.isBlank()) return u
+                  val l = u.lowercase()
+                  if (!l.contains("localhost") && !l.contains("127.0.0.1")) return u
+                  return try {
+                      val bu = java.net.URI(base)
+                      val host = bu.host ?: return u
+                      val port = if (bu.port > 0) ":" + bu.port else ""
+                      val scheme = if (l.startsWith("https")) "https" else "http"
+                      val rest = u.substringAfter("://").substringAfter("/", "")
+                      "$scheme://$host$port/" + rest
+                  } catch (t: Throwable) { u }
+              }
+
+              /** رابط نهائي للمشغّل: نصلّح المضيف لو كان محليًا. */
+              private fun done(u: String): String = if (u.isBlank()) "" else fixHost(u).trim()
+
               /** timeshift للبث المباشر. */
               fun timeshift(cmd: String, hours: Int): String {
                   val r = req("type=itv&action=create_link&cmd=" + Uri.encode(cleanCmd(cmd)) +
                       "&js_price=0&forced_country=&timeshift=" + (hours * 3600)) ?: return ""
-                  return urlFrom(r)
+                  return done(urlFrom(r))
               }
           }
 
@@ -4641,6 +4738,18 @@ jobs:
               var maxLive = 0
               var loaded = false
 
+              /** حالة جلب كل قسم: 0 = لم يُجلب، 1 = جارٍ، 2 = جُلبت كل صفحاته. */
+              private val fill = java.util.concurrent.ConcurrentHashMap<String, Int>()
+              fun fillState(kind: String, catId: String): Int = fill[kind + "|" + catId] ?: 0
+              fun fillSet(kind: String, catId: String, v: Int) { fill[kind + "|" + catId] = v }
+              fun fillDone(kind: String, catId: String): Boolean = fillState(kind, catId) == 2
+              fun fillBusy(kind: String, catId: String): Boolean = fillState(kind, catId) == 1
+              fun fillReset() { fill.clear() }
+
+              /** نص تقدّم الجلب في الخلفية (يظهر في شريط التحميل). */
+              @Volatile var bgMsg = ""
+              @Volatile var bgRun = false
+
               /** يعيد ترقيم القنوات المباشرة 1..n. */
               /**
                * نقطة تشغيل موحّدة للواجهة: MAC يمرّ عبر البوابة (create_link)، وغيره يُشغّل مباشرة.
@@ -4661,6 +4770,7 @@ jobs:
                   live.clear(); movie.clear(); series.clear()
                   liveCats.clear(); movieCats.clear(); seriesCats.clear()
                   expiry = "-"; status = "-"; loaded = false
+                  fillReset(); bgMsg = ""
               }
           }
 
@@ -4668,6 +4778,10 @@ jobs:
           object Loader {
               @Volatile var busy = false
               @Volatile var cancel = false
+
+              /** خيط واحد مستقل للجلب في الخلفية — لا يزاحم تشغيل القنوات (Bg.pool يبقى للضغط). */
+              private val bgPool = Executors.newSingleThreadExecutor()
+              @Volatile private var bgSeq = 0
 
               fun cacheFile(ctx: Context, p: Profile) = File(ctx.cacheDir, "pl/${p.key()}.gz")
 
@@ -4701,6 +4815,11 @@ jobs:
                                   Catalog.numbers()
                                   ok = true
                                   msg = "من الكاش (${fmtBytes(f.length())})"
+                                  // الكاش القديم كان يحفظ القنوات فقط → نكمل الأفلام والمسلسلات في الخلفية
+                                  if (p.type == "mac" && Catalog.movieCats.size + Catalog.seriesCats.size > 0 &&
+                                      Catalog.movie.isEmpty() && Catalog.series.isEmpty()) {
+                                      bgFillAll(ctx, p)
+                                  }
                               }
                           }
                           if (!ok) {
@@ -4785,8 +4904,7 @@ jobs:
                   for (g in Catalog.liveCats) g.count = Catalog.live.count { it.group == g.name }
               }
 
-              /** تحميل بوابة MAC: مصافحة ثم أقسام + كل القنوات والأفلام والمسلسلات (متوازي). */
-              /** عمق الجلب المحفوظ: 0 = صفحة 1 فقط، 1 = 6، 2 = 20، 3 = كل الصفحات (افتراضي). */
+              /** عمق الجلب (يبقى للتوافق): 0 = صفحة 1، 1 = 6، 2 = 20، وإلا كل الصفحات. */
               fun depth(ctx: Context): Int = when (ctx.sp.s("mac_depth", "3").toIntOrNull() ?: 3) {
                   0 -> 1
                   1 -> 6
@@ -4794,8 +4912,14 @@ jobs:
                   else -> 400
               }
 
+              /**
+               * تحميل بوابة MAC — مسار سريع بلا انتظار:
+               *   1) مصافحة البوابة (StalkerSession: نفس التوكن) — ثوانٍ
+               *   2) أقسام البث + الأفلام + المسلسلات
+               *   3) قنوات البث المباشر
+               * ثم يبدأ جلب الأفلام والمسلسلات **في الخلفية** (كل قسم بكل صفحاته) دون تجميد الواجهة.
+               */
               private fun loadMac(ctx: Context, p: Profile, progress: (String) -> Unit) {
-                  val deep = depth(ctx)
                   val st = StalkerSession.get(p)
                   progress("مصافحة البوابة…")
                   if (!st.connect()) throw java.io.IOException(st.lastError.ifBlank { "تعذّر الاتصال بالبوابة" })
@@ -4806,13 +4930,89 @@ jobs:
                   Catalog.seriesCats.clear(); Catalog.seriesCats.addAll(st.categories("series"))
                   progress("قنوات البث المباشر…")
                   st.channels(Catalog.live)
-                  progress("أفلام: جلب كل الأقسام…")
-                  val nm = st.fetchAll("movie", Catalog.movieCats, Catalog.movie, deep, 150_000L) { t -> Bg.ui { progress("أفلام • $t") } }
-                  progress("مسلسلات: جلب كل الأقسام…")
-                  val ns = st.fetchAll("series", Catalog.seriesCats, Catalog.series, deep, 210_000L) { t -> Bg.ui { progress("مسلسلات • $t") } }
                   Catalog.expiry = if (st.accountStatus.isBlank()) Catalog.expiry else ("حالة الحساب: " + st.accountStatus)
-                  Catalog.status = "${Catalog.live.size} قناة • $nm فيلم • $ns مسلسل" +
-                      (if (st.lastError.isNotBlank()) " • " + st.lastError else "")
+                  Catalog.fillReset()
+                  Catalog.status = "${Catalog.live.size} قناة • ${Catalog.movieCats.size} قسم أفلام • ${Catalog.seriesCats.size} قسم مسلسلات"
+                  bgFillAll(ctx, p)
+              }
+
+              /** يبدأ الجلب الكامل في الخلفية (يُستدعى من التحميل أو من الكاش). */
+              fun startBg(ctx: Context, p: Profile) { bgFillAll(ctx, p) }
+
+              /** يضيف عناصر قسم للمحلي بلا تكرار + يحدّث عدّاد القسم. */
+              fun appendCat(kind: String, catId: String, catName: String, items: List<Channel>): Int {
+                  if (items.isEmpty()) return 0
+                  val cat = if (kind == "movie") Catalog.movie else Catalog.series
+                  var added = 0
+                  synchronized(cat) {
+                      val seen = HashSet<String>()
+                      for (c in cat) seen.add(c.id + "|" + c.url)
+                      for (c in items) {
+                          if (c.name.isBlank()) continue
+                          if (seen.add(c.id + "|" + c.url)) { cat.add(c); added++ }
+                      }
+                      for (i in cat.indices) cat[i].num = i + 1
+                  }
+                  val gs = if (kind == "movie") Catalog.movieCats else Catalog.seriesCats
+                  gs.firstOrNull { it.catId == catId }?.count = cat.count { it.catId == catId }
+                  return added
+              }
+
+              /**
+               * الجلب الكامل في الخلفية: كل الأقسام (أفلام ثم مسلسلات)، كل صفحة في كل قسم،
+               * مع إخطار الواجهة كل قسمين حتى ترى العناصر تظهر تباعًا.
+               */
+              private fun bgFillAll(ctx: Context, p: Profile) {
+                  val mySeq = ++bgSeq
+                  Catalog.bgRun = true
+                  bgPool.execute {
+                      try {
+                          val st = StalkerSession.get(p)
+                          if (!st.connect()) { Catalog.bgMsg = st.lastError; Catalog.bgRun = false; return@execute }
+                          val plan = ArrayList<Pair<String, Group>>()
+                          for (g in ArrayList(Catalog.movieCats)) plan.add("movie" to g)
+                          for (g in ArrayList(Catalog.seriesCats)) plan.add("series" to g)
+                          var n = 0
+                          for (pr in plan) {
+                              if (mySeq != bgSeq || cancel) break
+                              val kind = pr.first; val g = pr.second
+                              if (g.catId.isBlank() || Catalog.fillState(kind, g.catId) != 0) { n++; continue }
+                              Catalog.fillSet(kind, g.catId, 1)
+                              val tmp = ArrayList<Channel>()
+                              try { st.fillCat(kind, g.catId, g.name, 400, tmp) } catch (t: Throwable) { Crash.log(t) }
+                              appendCat(kind, g.catId, g.name, tmp)
+                              Catalog.fillSet(kind, g.catId, 2)
+                              n++
+                              Catalog.bgMsg = "$n/${plan.size} قسم • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل"
+                              Catalog.status = "${Catalog.live.size} قناة • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل"
+                              if (n % 2 == 0) {
+                                  Events.send(ctx, "catalog")
+                                  try { Thread.sleep(120) } catch (e: Throwable) {}
+                              }
+                          }
+                          Catalog.status = "${Catalog.live.size} قناة • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل"
+                          saveCache(ctx, p)
+                          Events.send(ctx, "catalog")
+                      } catch (t: Throwable) { Crash.log(t) }
+                      Catalog.bgRun = false
+                  }
+              }
+
+              /** يحفظ القوائم الحالية (بعد اكتمال الجلب الخلفي) حتى لا تُعاد من الصفر. */
+              private fun saveCache(ctx: Context, p: Profile) {
+                  try {
+                      val o = JSONObject()
+                      o.put("live", encodeChans(Catalog.live))
+                      o.put("movie", encodeChans(Catalog.movie))
+                      o.put("series", encodeChans(Catalog.series))
+                      o.put("liveCats", encodeGroups(Catalog.liveCats))
+                      o.put("movieCats", encodeGroups(Catalog.movieCats))
+                      o.put("seriesCats", encodeGroups(Catalog.seriesCats))
+                      o.put("expiry", Catalog.expiry)
+                      o.put("status", Catalog.status)
+                      o.put("source", p.type)
+                      writeGz(cacheFile(ctx, p), o.toString())
+                  } catch (t: Throwable) { Crash.log(t) }
               }
 
               /** جلب صفحة واحدة من قسم (عند البحث على السيرفر). */
@@ -4854,9 +5054,11 @@ jobs:
                   Bg.pool.execute {
                       var n = 0
                       try {
+                          if (Catalog.fillState(kind, catId) == 0) Catalog.fillSet(kind, catId, 1)
                           val st = StalkerSession.get(p)
-                          if (st.connect()) n = st.fillCat(kind, catId, catName, depth(ctx), out)
+                          if (st.connect()) n = st.fillCat(kind, catId, catName, 400, out)   // 400 = كل صفحات القسم
                           else Catalog.status = st.lastError
+                          Catalog.fillSet(kind, catId, 2)
                       } catch (t: Throwable) { Crash.log(t) }
                       val fn = n
                       Bg.ui { cb(fn) }
@@ -6112,7 +6314,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.7 (code 87)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.8 (code 88)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
