@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.13"
-      VERSION_CODE: "813"
+      VERSION_NAME: "8.14"
+      VERSION_CODE: "814"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 813)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.13")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 814)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.14")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -299,6 +299,15 @@ jobs:
           | فلم → يرجع للواجهة الأولى | نفس الاستثناء + معالج الأعطال يعيد تشغيل التطبيق إلى الواجهة الأولى | نفس الإصلاح |
           | مسلسل → لا تظهر الحلقات | مسار الحلقات كان ينتهي بالمشغّل (الذي كان يطيح) — لذلك لا يظهر شي | المشغل صار يفتح + رسالة صريحة: «حُمّلت N حلقة» أو «اختر الموسم (M موسم)» + مسار احتياطي |
           | — | حماية إضافية | أي استثناء في `onCreate` لأي شاشة يُسجّل في «سجل الأعطال» ويظهر كتنبيه بدل الخروج |
+
+          ## 8.14 — القنوات تشتغل + الأفلام ملء الشاشة + المسلسل يبيّن المواسم والحلقات
+
+          | ما لاحظته | السبب | الإصلاح (بنفس كود Java) |
+          |---|---|---|
+          | القناة المباشرة لا تشتغل (NETWORK_FAILED) | كنتُ أمرّر القناة على `create_link` والبوابة ترجع رابطًا غير شغّال | **مثل كود Java**: `playChannel` يشغّل `cmd` القناة مباشرة. الآن القناة تُشغَّل برابطها مباشرة، و`create_link` للأفلام/الحلقات فقط — **وإذا فشل رابط القناة نجرّب `create_link` تلقائيًا مرة واحدة** |
+          | الفلم يظهر بمشغل صغير | `toggleFull` كانت تُنادى فقط عند `asFull` | **مثل كود Java** (`if (doubleClick \|\| !isLive) toggleFull(true)`): كل فلم/حلقة تُفتح **ملء الشاشة** |
+          | الصورة لا تملأ الشاشة | `RESIZE_MODE_FIT` | نمط حجم الصورة محفوظ: **تكبير يملأ الشاشة** (افتراضي) + خيار في الإعدادات السريعة: ملاءمة / تكبير / تمديد — وضغطة طويلة على زر التوسيع تبدّل مباشرة |
+          | المسلسل يبيّن حلقات بدل المواسم | الشجرة كانت تُفرّغ الحلقات داخل القائمة | **مثل كود Java** (`findOrCreateStalkerSeasonFolder`): الشجرة تُنتج **بطاقة لكل موسم** («موسم 1 • 4 حلقة»)، والضغط على الموسم يجيب حلقاته (`fetchStalkerEpisodes`: 3 صيغ لطلب الحلقات) |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -2336,6 +2345,7 @@ jobs:
                   player = p
                   pv.player = p
                   pv.useController = true
+                  applyResize()
                   p.addListener(this)
               }
 
@@ -2352,6 +2362,7 @@ jobs:
 
               /** رقم آخر ضغطة: أي رد قديم (قناة سابقة) لا يقطع تشغيل ما ضغط عليه المستخدم للتو. */
               private var playSeq = 0
+              private var resolvedLive = false
 
               private fun play(c: Channel, full0: Boolean) {
                   playSeq++
@@ -2368,6 +2379,13 @@ jobs:
                   if (p?.type == "mac") {
                       if (url.isBlank()) url = Stalker.localCmd(c.id.ifBlank { c.mid })   // أمر MAG من المعرّف
                       if (url.isBlank()) { toast("لا يوجد أمر تشغيل لهذا العنصر"); return }
+                      // مثل كود Java: القناة المباشرة رابطها جاهز → تُشغَّل مباشرة بلا create_link
+                      if (c.kind == "live" && directUrl(url)) {
+                          resolvedLive = false
+                          c.url = url
+                          startPlayback(c, url, full0)
+                          return
+                      }
                       val cmd0 = url
                       pendingPlayer(c, full0, "جارٍ تجهيز رابط البوابة…")
                       Loader.macPlayable(p, c.kind, cmd0, c.mid, c.sid, c.id) { u ->
@@ -2391,6 +2409,14 @@ jobs:
                   if (url.startsWith("rtmp") || url.startsWith("mms")) { openExternal(url); return }
                   if (url.isBlank()) { toast("لا يوجد رابط تشغيل لهذا العنصر"); return }
                   startPlayback(c, url, full0)
+              }
+
+              /** رابط قابل للتشغيل مباشرة (ليس أمر بوابة محلي ولا رابطًا نسبيًا). */
+              private fun directUrl(u: String): Boolean {
+                  if (u.isBlank()) return false
+                  val l = u.lowercase()
+                  if (l.contains("localhost") || l.contains("127.0.0.1")) return false
+                  return l.startsWith("http://") || l.startsWith("https://") || l.startsWith("rtsp") || l.startsWith("udp") || l.startsWith("rtmp")
               }
 
               /** يفتح شاشة المشغل فورًا (عنوان + شريط تحميل) قبل ما يوصل الرابط. */
@@ -2471,7 +2497,7 @@ jobs:
                   p.playWhenReady = true
                   pv.player = p
                   if (full) pvFull.player = p
-                  if (asFull && !full) toggleFull(true)
+                  if ((asFull || c.kind != "live") && !full) toggleFull(true)     // نفس كود Java: الأفلام/الحلقات ملء الشاشة
                   if (!full) { dockBusy.visibility = View.VISIBLE; tvLoadPct.text = "0%" }
                   else { fullBusy.visibility = View.VISIBLE; tvFullPct.text = "0%" }
                   armWd()
@@ -2498,7 +2524,7 @@ jobs:
                       fullBox.visibility = View.VISIBLE
                       goImmersive()
                       try { PlayerView.switchTargetView(p, pv, pvFull) } catch (t: Throwable) { Crash.log(t) }
-                      pvFull.resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                      applyResize()
                       pvFull.useController = false
                       fullTitle.text = cur?.name ?: ""
                       findViewById<View>(R.id.fullBar)?.requestFocus()
@@ -2507,6 +2533,25 @@ jobs:
                       fullBox.visibility = View.GONE
                       try { PlayerView.switchTargetView(p, pvFull, pv) } catch (t: Throwable) { Crash.log(t) }
                   }
+              }
+
+              /** نمط حجم الصورة: 0 = ملاءمة، 1 = تكبير يملأ الشاشة (افتراضي)، 2 = تمديد. */
+              private fun applyResize() {
+                  val md = when (sp.s("resize_mode", "1")) {
+                      "0" -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                      "2" -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+                      else -> androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                  }
+                  try { pv.resizeMode = md } catch (t: Throwable) {}
+                  try { pvFull.resizeMode = md } catch (t: Throwable) {}
+              }
+
+              private fun cycleResize() {
+                  val cur0 = sp.s("resize_mode", "1")
+                  val nxt = when (cur0) { "0" -> "1"; "1" -> "2"; else -> "0" }
+                  sp.put("resize_mode", nxt)
+                  applyResize()
+                  toast("حجم الصورة: " + when (nxt) { "0" -> "ملاءمة"; "1" -> "تكبير يملأ الشاشة"; else -> "تمديد" })
               }
 
               private fun hideBarsSoon() {
@@ -2579,6 +2624,20 @@ jobs:
                   val smartAlt = sp.b("smart_alt", true)
                   val canAlt = !usingAlt && smartAlt && (cur?.alt?.isNotBlank() == true) && cur?.alt != cur?.url
                   val msg = e.errorCodeName
+                  // قناة MAC مباشرة فشل رابطها؟ نجرّب create_link مرة واحدة (احتياطي ذكي)
+                  val pm = Catalog.profile
+                  if (!resolvedLive && pm?.type == "mac" && cur?.kind == "live" && pm != null) {
+                      resolvedLive = true
+                      val ch = cur ?: return
+                      busy(true, "تجربة مسار البوابة (create_link)…")
+                      Loader.macPlayable(pm, "live", ch.url, ch.mid, ch.sid, ch.id) { u ->
+                          busy(false, "")
+                          if (u.isNotBlank() && u != ch.url) { ch.url = u; startPlayback(ch, u, full) } else {
+                              tvWd.text = "فشل التشغيل: $msg"; wdBar.visibility = View.VISIBLE
+                          }
+                      }
+                      return
+                  }
                   if (canAlt) { playAlt(); return }
                   if (retries <= 3) {
                       val wait = 700L * retries
@@ -2949,7 +3008,8 @@ jobs:
                       "معلومات الجلسة والحساب",
                       "تغيير رمز القفل",
                       "مسح السجل",
-                      "عمق الجلب (أفلام/مسلسلات): " + depthLabel()
+                      "عمق الجلب (أفلام/مسلسلات): " + depthLabel(),
+                      "حجم الصورة: " + when (sp.s("resize_mode", "1")) { "0" -> "ملاءمة"; "1" -> "تكبير يملأ الشاشة"; else -> "تمديد" }
                   )
                   pickDialog("الإعدادات السريعة", items) { i ->
                       when (i) {
@@ -2969,6 +3029,7 @@ jobs:
                           }
                           5 -> { recents.clear(); sp.put("recents", "[]"); buildGroups(); refresh(); toast("مُسح السجل") }
                           6 -> cycleDepth()
+                          7 -> cycleResize()
                       }
                   }
               }
@@ -3146,6 +3207,10 @@ jobs:
                   findViewById<View>(R.id.tab_settings).setOnClickListener { settingsDialog() }
 
                   findViewById<Button>(R.id.btn_dock_full).setOnClickListener { toggleFull(true) }
+                  try {
+                      findViewById<Button>(R.id.btn_dock_full).setOnLongClickListener { cycleResize(); true }
+                      findViewById<Button>(R.id.btn_full_close).setOnLongClickListener { cycleResize(); true }
+                  } catch (t: Throwable) {}
                   findViewById<Button>(R.id.btn_dock_fav).setOnClickListener { toggleFav() }
                   findViewById<Button>(R.id.btn_dock_catch).setOnClickListener { catchup() }
                   findViewById<Button>(R.id.btn_prev).setOnClickListener { prev() }
@@ -4604,27 +4669,24 @@ jobs:
                       val js = jsOf(r)
                       val seasons = if (js is JSONObject) js.optJSONObject("series") else null
                       if (seasons != null) {
-                          val keys = seasons.keys()
-                          while (keys.hasNext()) {
-                              val k = keys.next()
+                          // مثل كود Java: نعرض **المواسم** كبطاقات، والحلقات تُجلب عند الضغط على الموسم
+                          val keys = ArrayList<String>()
+                          val it = seasons.keys(); while (it.hasNext()) keys.add(it.next())
+                          keys.sortBy { it.toIntOrNull() ?: 9999 }
+                          for (k in keys) {
                               val sd = seasons.optJSONObject(k) ?: continue
                               val seasonName = sd.optString("name").ifBlank { "موسم $k" }
                               val eps = sd.optJSONArray("series") ?: sd.optJSONArray("episodes")
-                              if (eps == null) {
-                                  out.add(Channel().apply {
-                                      kind = "season"; stype = "season"; name = seasonName
-                                      group = if (genre.isBlank()) "مسلسلات" else genre
-                                      id = "season_" + seriesId + "_" + k; mid = seriesId; sid = k
-                                      logo = cover; catId = seriesId
-                                  })
-                                  added++
-                                  continue
-                              }
-                              for (i in 0 until eps.length()) {
-                                  val e = eps.optJSONObject(i) ?: continue
-                                  out.add(episodeChannel(e, seriesId, k, seasonName, genre, cover, out.size))
-                                  added++
-                              }
+                              val cnt = eps?.length() ?: 0
+                              out.add(Channel().apply {
+                                  kind = "season"; stype = "season"
+                                  name = if (cnt > 0) "$seasonName • $cnt حلقة" else seasonName
+                                  group = if (genre.isBlank()) "مسلسلات" else genre
+                                  id = "season_" + seriesId + "_" + k; mid = seriesId; sid = k
+                                  logo = cover; catId = seriesId
+                                  extra = seasonName
+                              })
+                              added++
                           }
                       }
                       if (added == 0) {
@@ -4688,6 +4750,8 @@ jobs:
                   val enc = Uri.encode(seriesId)
                   val urls = ArrayList<String>()
                   if (seasonId.isNotBlank()) urls.add("type=series&action=get_ordered_list&movie_id=$enc&season_id=" + Uri.encode(seasonId) + "&p=1&detailed=1")
+                  if (seasonId.isNotBlank()) urls.add("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$seasonId") + "&p=1&detailed=1")
+                  if (seasonId.isNotBlank()) urls.add("type=vod&action=get_ordered_list&movie_id=" + enc + "&season_id=" + Uri.encode(seasonId) + "&p=1&detailed=1")
                   urls.add("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$seriesId") + "&p=1&detailed=1")
                   urls.add("type=vod&action=get_ordered_list&genre=" + enc + "&p=1&detailed=1&series_id=" + enc)
                   for (u in urls) {
@@ -6522,7 +6586,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.13 (code 813)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.14 (code 814)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
