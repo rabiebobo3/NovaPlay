@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.18"
-      VERSION_CODE: "818"
+      VERSION_NAME: "8.19"
+      VERSION_CODE: "819"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 818)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.18")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 819)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.19")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -345,6 +345,16 @@ jobs:
           | **الرجوع لا يرجع للفلم/المسلسل** | حالة القسم (المواسم/الحلقات + الموضع) كانت تُفقد عند العودة | تُحفظ الحالة قبل فتح المشغل وتُستعاد عند الرجوع: نفس القسم، نفس المستوى، نفس العنصر معلَّمًا ▶ ونفس موضع التمرير — تصمد حتى لو أُعيد إنشاء الشاشة |
           | **ترتيب ودقة المواسم** | رقم الموسم كان يُقرأ من المفتاح لا من الاسم | الترقيم والعرض من اسم الموسم («موسم 3») والترتيب رقمي، والحلقات بلا تكرار ومرتبة |
           | **فحص قبل الإرسال** | — | تصريف Sources/Core/Grid/Live + 53 اختبار بوابة ⇒ **0 خطأ / 53 ناجح** |
+
+          ## 8.19 — الحلقات تُجلب مثل كود Java + الصورة تلقائيًا على شاشة الهاتف
+
+          | النقطة | ما تم |
+          |---|---|
+          | **الحلقات ما تظهرش** | صار نفس كود Java بالحرف: بعد ظهور المواسم تُجلب حلقاتها **في الخلفية فورًا** (`fetchStalkerEpisodes` بعد كل مجلد موسم) ⇒ الضغط على الموسم يعرض فورًا، بلا انتظار وبلا فشل |
+          | **آخر حل إذا البوابة رفضت الموسم** | إن لم يُطابق الموسم، تُطلب القائمة بلا موسم — ومواسم فارغ يطابق الكل (`isSameMacPortalSeason`) ⇒ تظهر **كل حلقات المسلسل** مع اسم كل موسم |
+          | **دعم حلقات كنصوص** | بعض البوابات ترسل `series: ["101","102"]` (نصوص لا كائنات) — صار تُقرأ مثل Java |
+          | **الصورة تلقائيًا** | الوضع الافتراضي **تلقائي: يملأ شاشة الهاتف** بلا شدّ، ويُعاد تطبيقه مع كل فيديو حسب أبعاد شاشة هاتفك؛ ضغطة مطوّلة على «توسيع» تبدّل يدويًا |
+          | **إذا بقيت مشكلة** | يُكتب تشخيص في **سجل الأعطال** (الإعدادات): آخر طلب أُرسل ورد البوابة — أرسله ليّ ونعرف السبب بالضبط |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -675,6 +685,16 @@ jobs:
                   try {
                       val f = File(NovaApp.ctx?.filesDir ?: File("/data/local/tmp"), "crash.log")
                       val line = "[log] ${t.javaClass.simpleName}: ${t.message}\n"
+                      f.parentFile?.mkdirs()
+                      if (f.exists() && f.length() < 120_000) f.appendText(line) else f.writeText(line)
+                  } catch (t2: Throwable) {}
+              }
+
+              /** (8.19) سطر تشخيص في نفس سجل الأعطال (يُقرأ من الإعدادات ← سجل الأعطال). */
+              fun note(tag: String, msg: String) {
+                  try {
+                      val f = File(NovaApp.ctx?.filesDir ?: File("/data/local/tmp"), "crash.log")
+                      val line = "[" + tag + "] " + msg + "\n"
                       f.parentFile?.mkdirs()
                       if (f.exists() && f.length() < 120_000) f.appendText(line) else f.writeText(line)
                   } catch (t2: Throwable) {}
@@ -1886,12 +1906,19 @@ jobs:
                           Loader.macSeason(p, c.mid, c.sid, out) { n ->
                               try {
                                   showBusy(false, "")
-                                  if (n == 0) { toast("لا توجد حلقات لهذا الموسم"); return@macSeason }
+                                  if (n == 0) {
+                                      // تشخيص: نكتب آخر الطلبات في سجل الأعطال حتى نعرف سبب الرفض بالضبط
+                                      val info = try { StalkerSession.get(p).lastEpsInfo } catch (t: Throwable) { "" }
+                                      Crash.note("EPS-FAIL", "series=${c.mid} season=${c.sid} :: " + info)
+                                      toast("البوابة ما رجعتش حلقات — راجع «سجل الأعطال» من الإعدادات")
+                                      return@macSeason
+                                  }
                                   if (saved.isEmpty()) { saved.addAll(all) }
                                   all.clear(); all.addAll(out)
                                   inEpisodes = true; seriesName = c.name + " • " + c.group
                                   curSeriesMid = c.mid
                                   applyFilter(); rvGrid.scrollToPosition(0)
+                                  toast("حُمّلت ${out.size} حلقة")
                               } catch (t: Throwable) {
                                   try { showBusy(false, "") } catch (e: Throwable) {}
                                   Crash.log(t)
@@ -1932,9 +1959,13 @@ jobs:
                                   inEpisodes = true; seriesName = c.name
                                   curSeriesMid = c.mid
                                   if (out.any { it.kind == "season" }) {
-                                      // مواسم فقط: المستخدم يضغط الموسم ليُحمَّل
+                                      // مواسم فقط: نبدأ فورًا (في الخلفية) جلب حلقات كل موسم مثل كود Java
                                       seriesName = c.name
                                       toast("اختر الموسم لتحميل حلقاته (${out.size} موسم)")
+                                      Loader.prefetchEps(p, out) { s, nn ->
+                                          if (!s.name.contains("حلقة")) s.name = s.name + " • $nn حلقة"
+                                          try { adapter.notifyDataSetChanged() } catch (t: Throwable) {}
+                                      }
                                   } else {
                                       toast("حُمّلت ${out.size} حلقة")
                                   }
@@ -2382,10 +2413,10 @@ jobs:
                   bind()                                     // ← أولًا: هنا تُعيَّن pv/pvFull وباقي العناصر
                   // نسبة الصورة: «تكبير يملأ الشاشة» افتراضيًا (يملأ الهاتف بلا شدّ). ترقية مرة واحدة من 8.17
                   // (النسخة السابقة كانت تحفظ 16:9 الثابتة تلقائيًا ⇒ أشرطة سوداء على الجانبين)
-                  if (sp.s("rm3", "") != "1") {
-                      val oldMode = sp.s("rm2", "")
-                      if (oldMode.isBlank() || oldMode == "0" || oldMode == "3") sp.put("rm2", "1")
-                      sp.put("rm3", "1")
+                  if (sp.s("rm4", "") != "1") {
+                      sp.put("rm2", "1")                     // تلقائي: يملأ شاشة الهاتف
+                      sp.put("rm_man", "0")
+                      sp.put("rm4", "1")
                   }
                   pv.controllerAutoShow = !tv                // (كان قبل bind() → استثناء يفتح شاشة المشغل = طيّاح التطبيق)
                   pv.controllerShowTimeoutMs = if (tv) 2600 else 4200
@@ -2721,7 +2752,7 @@ jobs:
               }
 
               /**
-               * نسبة الصورة (v8.18): 1 تكبير يملأ الشاشة (افتراضي — يملأ الهاتف بلا شدّ، قصّ خفيف فقط)،
+               * نسبة الصورة (v8.19): 1 تلقائي — يملأ شاشة الهاتف بلا شدّ (قصّ خفيف فقط) وهو الافتراضي،
                * 0 ملاءمة مضبوطة (الصورة كاملة بأشرطة)، 2 تمديد، 3 نسبة 16:9 ثابتة، 4 نسبة 4:3 ثابتة.
                */
               private fun applyResize() {
@@ -2776,6 +2807,7 @@ jobs:
                   val i = order.indexOf(sp.s("rm2", "1")).let { if (it < 0) 0 else it }
                   val nxt = order[(i + 1) % order.size]
                   sp.put("rm2", nxt)
+                  sp.put("rm_man", if (nxt == "1") "0" else "1")
                   applyResize()
                   toast("نسبة الصورة: " + ratioLabel(nxt))
               }
@@ -2881,7 +2913,7 @@ jobs:
 
               /** اسم نسبة الصورة الحالية (تظهر في الإعدادات وفي التنبيه). */
               private fun ratioLabel(m: String): String = when (m) {
-                  "1" -> "تكبير يملأ الشاشة"
+                  "1" -> "تلقائي — يملأ شاشة الهاتف"
                   "2" -> "تمديد"
                   "3" -> "16:9 ثابتة"
                   "4" -> "4:3 ثابتة"
@@ -2944,6 +2976,8 @@ jobs:
                   lastW = w
                   lastH = h
                   fullQual.text = if (w > 0 && h > 0) "$w×$h" else ""
+                  // تلقائي على حساب شاشة الهاتف: يُعاد ضبط الصندوق مع كل فيديو ما لم يختر المستخدم وضعًا بنفسه
+                  if (sp.s("rm_man", "0") != "1") { try { applyResize() } catch (t: Throwable) { Crash.log(t) } }
                   // لا نبدّل نسبة الصورة تلقائيًا: الأبعاد المقلوبة من السرفر لا تُغيّر الصورة المعروضة،
                   // والتبديل التلقائي كان يضعها في إطار 16:9 بأشرطة سوداء (شكوى 8.17). التبديل يدوي بضغطة مطوّلة.
               }
@@ -4493,6 +4527,8 @@ jobs:
               var accountStatus = ""
                   private set
               var lastError = ""
+              @Volatile var lastReq = ""              // آخر طلب أُرسل (للتشخيص في سجل الأعطال)
+              @Volatile var lastEpsInfo = ""          // تشخيص جلب الحلقات
                   private set
               var liveCats = ArrayList<Group>()
                   private set
@@ -4592,12 +4628,14 @@ jobs:
                           val t = r.trimStart()
                           if (r.isNotBlank() && (t.startsWith("{") || t.startsWith("["))) {
                               loadPath = pth; probed = true
+                              lastReq = q + " ⇒ ok(" + r.length + ")"
                               return r
                           }
-                          err = "رد غير JSON من $pth"
+                          err = "رد غير JSON: " + r.take(40)
                       } catch (t: Throwable) { err = t.message ?: t.javaClass.simpleName }
                   }
                   lastError = if (err.isBlank()) "لا رد من البوابة" else err
+                  lastReq = q + " ⇒ " + lastError
                   return null
               }
 
@@ -5227,6 +5265,21 @@ jobs:
               /** خازن حلقات المواسم المدمجة في الاستجابة (بلا طلب إضافي). */
               private val seasonCache = HashMap<String, List<Channel>>()
 
+              /** هل حلقات هذا الموسم موجودة في الخازن؟ (يستعمله الجلب المسبق) */
+              fun hasCachedEps(seriesId0: String, seasonId: String): Boolean {
+                  val sId = seriesId0.replace("series_", "").trim()
+                  val raw = seasonId.trim()
+                  val n = seasonNum(raw, "")
+                  synchronized(seasonCache) {
+                      for (k in listOf(sId + "|" + raw, sId + "|" + n, sId + "|*")) {
+                          if (k.endsWith("|")) continue
+                          val v = seasonCache[k]
+                          if (v != null && v.isNotEmpty()) return true
+                      }
+                  }
+                  return false
+              }
+
               /**
                * حلقات موسم — **نفس كود Java** (`fetchStalkerEpisodes`):
                * 3 صيغ للرابط + مطابقة الموسم `isSameMacPortalSeason` + قراءة `server.series[]`.
@@ -5242,6 +5295,7 @@ jobs:
                           ?: seasonNum(raw, "").takeIf { it.isNotBlank() }?.let { seasonCache[seriesId + "|" + it] }
                       if (hit != null && hit.isNotEmpty()) { out.addAll(hit); return hit.size }
                   }
+                  val diag = StringBuilder()
                   val enc = Uri.encode(seriesId)
                   val urls = ArrayList<String>()
                   urls.add("type=series&action=get_ordered_list&movie_id=$enc&p=1")
@@ -5250,17 +5304,34 @@ jobs:
                       urls.add("type=series&action=get_ordered_list&movie_id=$enc&season_id=" + Uri.encode(k) + "&p=1")
                   urls.add("type=series&action=get_series_info&movie_id=$enc")
                   for (u in urls) {
-                      val r = req(u) ?: continue
+                      val r = req(u)
+                      diag.append(lastReq).append(" | ")
+                      if (r == null) continue
                       val tmp = ArrayList<Channel>()
                       val n = parseSeasonEpisodes(r, seriesId, key, tmp)
                       if (n > 0) return finishEps(seriesId, key, tmp, out)
                   }
                   // صيغ النجاة: movie_id = series:season (بالمفتاح أو برقم الموسم)
                   for (k in listOf(key, seasonNum(raw, "")).filter { it.isNotBlank() }.distinct()) {
-                      val r = req("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$k") + "&p=1") ?: continue
+                      val r = req("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$k") + "&p=1")
+                      diag.append("$seriesId:$k ⇒ ").append(if (r == null) lastError else "ok(" + r.length + ")").append(" | ")
+                      if (r == null) continue
                       val tmp = ArrayList<Channel>()
                       if (parseSeasonEpisodes(r, seriesId, k, tmp) > 0) return finishEps(seriesId, k, tmp, out)
                   }
+                  // (8.19) آخر حل — نفس كود Java: موسم فارغ يطابق كل المواسم ⇒ نعرض كل حلقات المسلسل
+                  if (raw.isNotBlank()) {
+                      for (u in listOf("type=series&action=get_ordered_list&movie_id=$enc&p=1",
+                                       "type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$seriesId") + "&p=1")) {
+                          val r = req(u)
+                          diag.append("ALL:").append(lastReq).append(" | ")
+                          if (r == null) continue
+                          val tmp = ArrayList<Channel>()
+                          if (parseSeasonEpisodes(r, seriesId, "", tmp) > 0) return finishEps(seriesId, "*", tmp, out)
+                      }
+                  }
+                  lastEpsInfo = "series=$seriesId season=$seasonId :: " + diag.toString().take(400)
+                  try { Crash.note("EPS", lastEpsInfo) } catch (t: Throwable) {}
                   return 0
               }
 
@@ -5290,7 +5361,7 @@ jobs:
                           val eps = sd.optJSONArray("series") ?: sd.optJSONArray("episodes") ?: continue
                           val sName = str(sd, "name", "title").ifBlank { "موسم $k" }
                           for (i in 0 until eps.length()) {
-                              val e = eps.optJSONObject(i) ?: continue
+                              val e = epOf(eps, i) ?: continue
                               val c = episodeChannel(e, seriesId, k, sName, "", "", out.size)
                               if (out.none { it.id == c.id }) out.add(c)
                           }
@@ -5312,7 +5383,7 @@ jobs:
                       val sId = if (returnedId.isNotBlank()) returnedId else seasonId
                       val sName = str(season, "name", "title").ifBlank { "موسم " + returnedSeasonNumber.ifBlank { sId } }
                       for (e in 0 until nested.length()) {
-                          val ep = nested.optJSONObject(e) ?: continue
+                          val ep = epOf(nested, e) ?: continue
                           val c = episodeChannel(ep, seriesId, sId, sName, "", "", out.size)
                           if (out.none { it.id == c.id }) { out.add(c); added++ }
                       }
@@ -5332,7 +5403,7 @@ jobs:
                       if (groups == 1 && solo != null) {
                           val sn = solo
                           for (e in 0 until sn.length()) {
-                              val ep = sn.optJSONObject(e) ?: continue
+                              val ep = epOf(sn, e) ?: continue
                               val c = episodeChannel(ep, seriesId, seasonId, "", "", "", out.size)
                               if (out.none { it.id == c.id && it.name == c.name }) { out.add(c); added++ }
                           }
@@ -5343,7 +5414,7 @@ jobs:
                   if (added == 0 && arr.length() > 0) {
                       var flat = 0
                       for (i in 0 until arr.length()) {
-                          val o = arr.optJSONObject(i) ?: continue
+                          val o = epOf(arr, i) ?: continue
                           if (o.optJSONArray("series") != null || o.optJSONArray("episodes") != null) continue
                           if (looksLikeSeason(o)) continue          // بطاقة موسم ≠ حلقة
                           val cmd = cleanCmd(str(o, "cmd", "media_url", "url"))
@@ -5392,6 +5463,16 @@ jobs:
                       if (rNum > 0 && w != null && w == rNum) return true
                   }
                   return false
+              }
+
+              /** حلقة من عنصر قد يكون كائنًا أو نصًّا («101») — نفس ما يفعله كود Java في حلقة `series`. */
+              private fun epOf(arr: JSONArray, i: Int): JSONObject? {
+                  val o = arr.optJSONObject(i)
+                  if (o != null) return o
+                  val raw = arr.optString(i, "").trim()
+                  if (raw.isBlank() || raw == "null") return null
+                  if (raw.startsWith("{")) return try { JSONObject(raw) } catch (t: Throwable) { null }
+                  return JSONObject().put("id", raw).put("name", "الحلقة " + raw).put("cmd", raw)
               }
 
               private fun episodeChannel(e: JSONObject, seriesId: String, seasonId: String, seasonName: String, genre: String, cover: String, i: Int): Channel {
@@ -5973,6 +6054,29 @@ jobs:
               }
 
               /** شجرة مسلسل: مواسم + حلقات. */
+              /**
+               * (8.19) جلب حلقات المواسم في الخلفية — نفس ما يفعله كود Java بعد إنشاء كل مجلد موسم
+               * (`fetchStalkerEpisodes` فورًا) ⇒ الضغط على الموسم يعرض الحلقات فورًا وبلا فشل.
+               */
+              fun prefetchEps(p: Profile, seasons: List<Channel>, onEach: ((Channel, Int) -> Unit)? = null) {
+                  if (seasons.isEmpty()) return
+                  Bg.pool.execute {
+                      try {
+                          val st = StalkerSession.get(p)
+                          if (!st.connect()) return@execute
+                          var done = 0
+                          for (s in seasons) {
+                              if (done >= 30) break
+                              if (s.mid.isBlank() || st.hasCachedEps(s.mid, s.sid)) continue
+                              val tmp = ArrayList<Channel>()
+                              val n = try { st.seasonEpisodes(s.mid, s.sid, tmp) } catch (t: Throwable) { 0 }
+                              done++
+                              if (n > 0 && onEach != null) { val ss = s; val nn = n; Bg.ui { onEach(ss, nn) } }
+                          }
+                      } catch (t: Throwable) { Crash.log(t) }
+                  }
+              }
+
               fun macSeries(p: Profile, seriesId: String, name: String, genre: String, cover: String, out: MutableList<Channel>, cb: (Int) -> Unit) {
                   Bg.pool.execute {
                       var n = 0
@@ -5983,6 +6087,7 @@ jobs:
                       } catch (t: Throwable) { Crash.log(t) }
                       val fn = n
                       Bg.ui { cb(fn) }
+                      try { prefetchEps(p, out.filter { it.kind == "season" || it.stype == "season" }) } catch (t: Throwable) {}
                   }
               }
 
@@ -7224,7 +7329,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.18 (code 818)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.19 (code 819)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
