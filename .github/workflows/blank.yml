@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.8"
-      VERSION_CODE: "88"
+      VERSION_NAME: "8.9"
+      VERSION_CODE: "89"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 88)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.8")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 89)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.9")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -245,6 +245,17 @@ jobs:
           | المسلسلات لا تُجلب أبدًا | صارت في نفس مسار الجلب (خلفي + عند فتح القسم) وتظهر كاملة |
           | الضغط على قناة/فلم يُخرج التطبيق | `create_link` لكل عنصر MAC + أمر البوابة المحلي `http://localhost/ch/N_` يُصلَّح إلى مضيف البوابة (مثل جهاز MAG) + كل مسارات الضغط محميّة (تنبيه بدل خروج) |
           | القسم يُجلب مرة واحدة فقط | كل قسم يُوسم «مكتمل» (`Catalog.fillDone`) — يُجلب كاملًا مرة واحدة ثم يُقرأ من الذاكرة |
+
+          ## 8.9 — إصلاح «61,560 قناة»: حذف التكرار + كاش خفيف + الحلقات
+
+          | المشكلة | السبب الحقيقي | الحل |
+          |---|---|---|
+          | التطبيق يخرج / يرجع للواجهة الأولى | البوابة ترجع **نفس القائمة في كل صفحة** (`number=0..3`) → 4 × 15,390 = **61,560 قناة مكرّرة**، والذاكرة تنتفخ حتى يقتل النظام التطبيق | حذف التكرار (مفتاح id|name|url) + التوقف إذا الصفحة ما زادتش جديد + سقف أمان 30,000 قناة |
+          | الكاش نفسه | الكاش القديم كان يبني **نص JSON واحد ضخم** (40+ ميغا) ثم يضغطه → نفاد الذاكرة | كاش v2: **ملف لكل نوع** (live/movie/series + meta) وكتابة **متدفقة عنصر بعنصر** داخل gzip — بلا نصوص ضخمة |
+          | المسلسل لا يحمّل الحلقات | بعض البوابات ترسل `series_id` في `id` فقط، والحلقات ترجع 0 بلا رسالة | ضبط `mid=id` + **مسار احتياطي** (حلقات الموسم 1) + رسالة واضحة |
+          | ضغط القناة/الفلم | أمر البوابة `http://localhost/ch/N_` للمشغل مباشرة | (من 8.8) `create_link` ثم `fixHost()` + حماية كل مسارات الضغط |
+
+          **مهم بعد التثبيت:** اضغط «إعادة تحميل البوابة» مرّة واحدة (الكاش القديم `pl/` يُحذف تلقائيًا ويستعمل `pl2/`).
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -1785,15 +1796,31 @@ jobs:
                           }
                           return
                       }
-                      if (c.id.isNotBlank()) {
+                      if (c.id.isNotBlank() || c.mid.isNotBlank()) {
+                          if (c.mid.isBlank()) c.mid = c.id          // بعض البوابات ترسل series_id في id فقط
                           showBusy(true, "تحميل الحلقات…")
                           val out = ArrayList<Channel>()
-                          Loader.macSeries(p, c.id, c.name, c.group, c.logo, out) { n ->
+                          Loader.macSeries(p, c.mid, c.name, c.group, c.logo, out) { n ->
                               try {
                                   showBusy(false, "")
                                   if (n == 0) {
-                                      toast("لا توجد حلقات — سيتم تشغيل العنصر مباشرة")
-                                      playNow(c); return@macSeries
+                                      // مسار احتياطي: نجيب الحلقات مباشرة من الموسم 1
+                                      showBusy(true, "مسار احتياطي: جلب الحلقات…")
+                                      val out2 = ArrayList<Channel>()
+                                      Loader.macSeason(p, c.mid, "1", out2) { n2 ->
+                                          showBusy(false, "")
+                                          if (n2 > 0) {
+                                              if (saved.isEmpty()) saved.addAll(all)
+                                              all.clear(); all.addAll(out2)
+                                              inEpisodes = true; seriesName = c.name
+                                              applyFilter(); rvGrid.scrollToPosition(0)
+                                              toast("حُمّلت $n2 حلقة (مسار احتياطي)")
+                                          } else {
+                                              toast("البوابة لم ترجع حلقات: " + Catalog.status.take(60))
+                                              playNow(c)
+                                          }
+                                      }
+                                      return@macSeries
                                   }
                                   if (saved.isEmpty()) { saved.addAll(all) }
                                   all.clear(); all.addAll(out)
@@ -1801,6 +1828,7 @@ jobs:
                                   if (out.any { it.kind == "season" }) {
                                       // مواسم فقط: المستخدم يضغط الموسم ليُحمَّل
                                       seriesName = c.name
+                                      toast("اختر الموسم لتحميل حلقاته")
                                   }
                                   applyFilter(); rvGrid.scrollToPosition(0)
                               } catch (t: Throwable) {
@@ -3710,8 +3738,11 @@ jobs:
           import android.net.Uri
           import org.json.JSONArray
           import org.json.JSONObject
+          import java.io.BufferedOutputStream
           import java.io.File
+          import java.io.FileOutputStream
           import java.util.concurrent.Executors
+          import java.util.zip.GZIPOutputStream
 
           /* ========================================================================
            *  مصادر القوائم: M3U / Xtream-Codes / MAC (Stalker) + ذاكرة تحميل ذكية
@@ -3970,6 +4001,7 @@ jobs:
                   const val UA_STB = "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/534.12 (KHTML, like Gecko) Safari/534.12"
                   const val MAX_PAGES_PER_CAT = 60
                   const val MAX_ITEMS = 45000
+                  const val MAX_LIVE = 30000            // سقف أمان للذاكرة (بعض البوابات ترسل 60 ألف+)
                   const val PAGE_MIN = 14
 
                   fun normMac(raw: String): String {
@@ -4256,12 +4288,15 @@ jobs:
                       }
                   }
                   var n = 0
+                  val seen = HashSet<String>()
                   for (page in 0..3) {
                       val r = req("type=itv&action=get_all_channels&number=$page") ?: break
                       val arr = itemsOf(r)
                       if (arr.length() == 0) break
+                      val addedBefore = n
                       for (i in 0 until arr.length()) {
                           val o = arr.optJSONObject(i) ?: continue
+                          if (n >= MAX_LIVE) break
                           val c = Channel()
                           c.kind = "live"
                           c.num = ++n
@@ -4274,9 +4309,13 @@ jobs:
                           val gn = if (genres.containsKey(gid)) genres[gid]!! else ""
                           c.group = if (gn.isNotBlank()) gn else str(o, "tv_genre", "category_name").ifBlank { "عام" }
                           c.extra = str(o, "num")
+                          // حذف التكرار: بعض البوابات ترجع نفس القائمة في كل صفحة (60 ألف+ قناة مكرّرة)
+                          val key = c.id + "|" + c.name + "|" + c.url
+                          if (!seen.add(key)) { n--; continue }
                           c.stype = "live"
                           if (c.name.isNotBlank() && c.url.isNotBlank()) live.add(c)
                       }
+                      if (n == addedBefore) break              // الصفحة ما زادتش جديد → البوابة تعيد نفسها
                       if (arr.length() < 1000) break
                   }
                   if (live.isEmpty()) {
@@ -4293,7 +4332,8 @@ jobs:
                               if (c.url.isBlank() && c.id.isNotBlank()) c.url = localCmd(c.id)
                               c.logo = str(o, "logo", "picon")
                               c.group = g.name; c.catId = g.catId; c.stype = "live"
-                              if (c.name.isNotBlank() && c.url.isNotBlank()) live.add(c)
+                              val k2 = c.id + "|" + c.name + "|" + c.url
+                              if (c.name.isNotBlank() && c.url.isNotBlank() && seen.add(k2)) live.add(c)
                           }
                       }
                   }
@@ -4344,12 +4384,14 @@ jobs:
                       pool.submit {
                           val mine = ArrayList<Channel>()
                           try {
+                              val seenF = HashSet<String>()
                               val first = page(type, g.catId, 1, "")
                               if (first != null) {
                                   val arr = itemsOf(first)
                                   for (i in 0 until arr.length()) {
                                       val o = arr.optJSONObject(i) ?: continue
-                                      mine.add(toChannel(o, kind, g.name, g.catId, i + 1))
+                                      val c1 = toChannel(o, kind, g.name, g.catId, i + 1)
+                                      if (seenF.add(c1.id + "|" + c1.name)) mine.add(c1)
                                   }
                                   val pages = pagesOf(first)
                                   var p = 2
@@ -4358,10 +4400,13 @@ jobs:
                                       val r2 = page(type, g.catId, p, "") ?: break
                                       val a2 = itemsOf(r2)
                                       if (a2.length() == 0) break
+                                      val before2 = mine.size
                                       for (i in 0 until a2.length()) {
                                           val o2 = a2.optJSONObject(i) ?: continue
-                                          mine.add(toChannel(o2, kind, g.name, g.catId, mine.size + 1))
+                                          val c2 = toChannel(o2, kind, g.name, g.catId, mine.size + 1)
+                                          if (seenF.add(c2.id + "|" + c2.name)) mine.add(c2)
                                       }
+                                      if (mine.size == before2) break
                                       if (a2.length() < PAGE_MIN) break
                                       p++
                                   }
@@ -4392,18 +4437,23 @@ jobs:
                   var p = 1
                   var pages = 0
                   var added = 0
+                  val seen = HashSet<String>()
+                  for (c in out) seen.add(c.id + "|" + c.name)
                   while (p <= maxPages) {
                       val r = page(type, genreId, p, "") ?: break
                       val arr = itemsOf(r)
                       if (arr.length() == 0) break
+                      val before = added
                       for (i in 0 until arr.length()) {
                           val o = arr.optJSONObject(i) ?: continue
                           val c = toChannel(o, kind, catName, genreId, out.size + 1)
                           if (c.kind == "series") c.mid = c.id
+                          if (!seen.add(c.id + "|" + c.name)) continue     // نفس العنصر مرّة أخرى
                           out.add(c); added++
                           if (out.size >= MAX_ITEMS) return added
                       }
                       if (pages == 0) pages = pagesOf(r)               // عدد الصفحات (إن وُجد)
+                      if (added == before) break                       // الصفحة ما زادتش جديد
                       if (arr.length() < PAGE_MIN) break               // صفحة ناقصة = آخر صفحة
                       if (pages > 0 && p >= pages) break               // وصلنا للعدد المُعلن
                       p++
@@ -4783,9 +4833,42 @@ jobs:
               private val bgPool = Executors.newSingleThreadExecutor()
               @Volatile private var bgSeq = 0
 
-              fun cacheFile(ctx: Context, p: Profile) = File(ctx.cacheDir, "pl/${p.key()}.gz")
+              fun cacheFile(ctx: Context, p: Profile) = File(ctx.cacheDir, "pl2/${p.key()}")     // v2 = ملف لكل نوع
+              private fun cacheMeta(ctx: Context, p: Profile) = File(ctx.cacheDir, "pl2/${p.key()}.meta")
+              private fun cacheKind(ctx: Context, p: Profile, kind: String) = File(ctx.cacheDir, "pl2/${p.key()}.$kind")
 
               private fun ttl(): Long = 6L * 3600_000L
+
+              /**
+               * كتابة قائمة العناصر **متدفقة** (عنصر بعنصر داخل gzip) بلا بناء نص ضخم في الذاكرة.
+               * هذه كانت أهمّ أسباب انهيار التطبيق مع البوابات الكبيرة (60 ألف عنصر = نص 40 ميغا).
+               */
+              private fun writeChans(f: File, list: List<Channel>) {
+                  try {
+                      f.parentFile?.mkdirs()
+                      GZIPOutputStream(BufferedOutputStream(FileOutputStream(f))).use { out ->
+                          out.write("[".toByteArray(Charsets.UTF_8))
+                          var first = true
+                          synchronized(list) {
+                              for (c in list) {
+                                  if (!first) out.write(",".toByteArray(Charsets.UTF_8))
+                                  out.write(c.toJson().toString().toByteArray(Charsets.UTF_8))
+                                  first = false
+                              }
+                          }
+                          out.write("]".toByteArray(Charsets.UTF_8))
+                      }
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              private fun readChans(f: File, out: MutableList<Channel>) {
+                  out.clear()
+                  if (!f.exists()) return
+                  try { decodeChans(readGz(f), out) } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              private fun cacheOk(ctx: Context, p: Profile): Boolean =
+                  cacheKind(ctx, p, "live").exists() || cacheKind(ctx, p, "movie").exists() || cacheKind(ctx, p, "series").exists()
 
               fun load(ctx: Context, p: Profile, force: Boolean, progress: (String) -> Unit, done: (Boolean, String) -> Unit) {
                   if (busy) { done(false, "التحميل جارٍ بالفعل"); return }
@@ -4794,32 +4877,33 @@ jobs:
                       var ok = false
                       var msg = ""
                       try {
-                          val f = cacheFile(ctx, p)
-                          val age = if (f.exists()) System.currentTimeMillis() - f.lastModified() else Long.MAX_VALUE
-                          if (!force && age < ttl()) {
-                              val cached = readGz(f)
-                              if (!cached.isNullOrBlank()) {
-                                  progress("استرجاع من الذاكرة الذكية…")
-                                  val o = JSONObject(cached)
-                                  decodeChans(o.optString("live"), Catalog.live)
-                                  decodeChans(o.optString("movie"), Catalog.movie)
-                                  decodeChans(o.optString("series"), Catalog.series)
+                          try { File(ctx.cacheDir, "pl/${p.key()}.gz").delete() } catch (t: Throwable) {}   // كاش v1 القديم
+                          val fm = cacheMeta(ctx, p)
+                          val age = if (fm.exists()) System.currentTimeMillis() - fm.lastModified() else Long.MAX_VALUE
+                          if (!force && age < ttl() && cacheOk(ctx, p)) {
+                              progress("استرجاع من الذاكرة الذكية…")
+                              readChans(cacheKind(ctx, p, "live"), Catalog.live)
+                              readChans(cacheKind(ctx, p, "movie"), Catalog.movie)
+                              readChans(cacheKind(ctx, p, "series"), Catalog.series)
+                              val meta = try { readGz(fm) } catch (t: Throwable) { null }
+                              if (!meta.isNullOrBlank()) {
+                                  val o = JSONObject(meta)
                                   decodeGroups(o.optString("liveCats"), Catalog.liveCats)
                                   decodeGroups(o.optString("movieCats"), Catalog.movieCats)
                                   decodeGroups(o.optString("seriesCats"), Catalog.seriesCats)
                                   Catalog.expiry = o.optString("expiry", "-")
                                   Catalog.status = o.optString("status", "-")
                                   Catalog.source = o.optString("source", p.type)
-                                  Catalog.profile = p
-                                  Catalog.loaded = true
-                                  Catalog.numbers()
-                                  ok = true
-                                  msg = "من الكاش (${fmtBytes(f.length())})"
-                                  // الكاش القديم كان يحفظ القنوات فقط → نكمل الأفلام والمسلسلات في الخلفية
-                                  if (p.type == "mac" && Catalog.movieCats.size + Catalog.seriesCats.size > 0 &&
-                                      Catalog.movie.isEmpty() && Catalog.series.isEmpty()) {
-                                      bgFillAll(ctx, p)
-                                  }
+                              }
+                              Catalog.profile = p
+                              Catalog.loaded = true
+                              Catalog.numbers()
+                              ok = Catalog.live.size + Catalog.movie.size + Catalog.series.size > 0
+                              msg = "من الكاش (${Catalog.live.size} قناة • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل)"
+                              // كاش ناقص (قنوات فقط مثلًا) → نكمل الباقي في الخلفية
+                              if (p.type == "mac" && (Catalog.movie.isEmpty() || Catalog.series.isEmpty()) &&
+                                  Catalog.movieCats.size + Catalog.seriesCats.size > 0) {
+                                  bgFillAll(ctx, p)
                               }
                           }
                           if (!ok) {
@@ -4834,17 +4918,12 @@ jobs:
                               Catalog.source = p.type
                               Catalog.loaded = true
                               Catalog.numbers()
-                              val o = JSONObject()
-                              o.put("live", encodeChans(Catalog.live))
-                              o.put("movie", encodeChans(Catalog.movie))
-                              o.put("series", encodeChans(Catalog.series))
-                              o.put("liveCats", encodeGroups(Catalog.liveCats))
-                              o.put("movieCats", encodeGroups(Catalog.movieCats))
-                              o.put("seriesCats", encodeGroups(Catalog.seriesCats))
-                              o.put("expiry", Catalog.expiry)
-                              o.put("status", Catalog.status)
-                              o.put("source", p.type)
-                              writeGz(f, o.toString())
+                              writeChans(cacheKind(ctx, p, "live"), Catalog.live)
+                              if (p.type != "mac") {
+                                  writeChans(cacheKind(ctx, p, "movie"), Catalog.movie)
+                                  writeChans(cacheKind(ctx, p, "series"), Catalog.series)
+                              }
+                              writeMeta(ctx, p)
                               ok = true
                               msg = "تم التحديث"
                           }
@@ -4975,6 +5054,7 @@ jobs:
                           var n = 0
                           for (pr in plan) {
                               if (mySeq != bgSeq || cancel) break
+                              if (Catalog.movie.size + Catalog.series.size >= 80_000) break   // سقف ذاكرة
                               val kind = pr.first; val g = pr.second
                               if (g.catId.isBlank() || Catalog.fillState(kind, g.catId) != 0) { n++; continue }
                               Catalog.fillSet(kind, g.catId, 1)
@@ -4998,21 +5078,28 @@ jobs:
                   }
               }
 
-              /** يحفظ القوائم الحالية (بعد اكتمال الجلب الخلفي) حتى لا تُعاد من الصفر. */
-              private fun saveCache(ctx: Context, p: Profile) {
+              /** ملف الوصف (أقسام/حالة/انتهاء) — صغير جدًا. */
+              private fun writeMeta(ctx: Context, p: Profile) {
                   try {
                       val o = JSONObject()
-                      o.put("live", encodeChans(Catalog.live))
-                      o.put("movie", encodeChans(Catalog.movie))
-                      o.put("series", encodeChans(Catalog.series))
                       o.put("liveCats", encodeGroups(Catalog.liveCats))
                       o.put("movieCats", encodeGroups(Catalog.movieCats))
                       o.put("seriesCats", encodeGroups(Catalog.seriesCats))
                       o.put("expiry", Catalog.expiry)
                       o.put("status", Catalog.status)
                       o.put("source", p.type)
-                      writeGz(cacheFile(ctx, p), o.toString())
+                      o.put("v", 2)
+                      cacheMeta(ctx, p).parentFile?.mkdirs()
+                      writeGz(cacheMeta(ctx, p), o.toString())
                   } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              /** يحفظ القوائم الحالية (بعد الجلب الخلفي) حتى لا تُعاد من الصفر — كتابة متدفقة. */
+              private fun saveCache(ctx: Context, p: Profile) {
+                  writeChans(cacheKind(ctx, p, "live"), Catalog.live)
+                  writeChans(cacheKind(ctx, p, "movie"), Catalog.movie)
+                  writeChans(cacheKind(ctx, p, "series"), Catalog.series)
+                  writeMeta(ctx, p)
               }
 
               /** جلب صفحة واحدة من قسم (عند البحث على السيرفر). */
@@ -6314,7 +6401,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.8 (code 88)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.9 (code 89)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
