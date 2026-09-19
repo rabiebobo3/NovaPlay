@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.10"
-      VERSION_CODE: "810"
+      VERSION_NAME: "8.11"
+      VERSION_CODE: "811"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 810)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.10")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 811)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.11")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -267,6 +267,20 @@ jobs:
           | عنصر بلا `cmd`؟ | نبني أمر جهاز MAG `http://localhost/ch/<id>_` من المعرّف ثم `create_link` (قناة/فلم/حلقة) |
           | الضغط → `actuallyPlayChannel` → المشغل يظهر ويشتغل | `play()` تفتح شاشة المشغل **فورًا** (`pendingPlayer`) ثم تُسند الرابط؛ الفشل يظهر **داخل المشغل** (`showPlayerError`) لا خروج |
           | ترويسات التشغيل: Cookie + Referer + UA + `Authorization: Bearer <token>` | `Stalker.playHeaders()` في `buildPlayer` (media3) |
+
+          ## 8.11 — دمج دوال MAC Portal من كود Java حرفيًا + الربط بالمشغل
+
+          | دالة كود Java | مكانها في هذا الكود |
+          |---|---|
+          | `fetchStalkerPortalData` (handshake) | `Stalker.connect()` (5 مسارات × نسختي ترويسات × 4 صيغ) |
+          | `Authorization: Bearer <token>` + `X-User-Agent: Mozilla/5.0 (QtEmbedded; Linux; C)` | `Stalker.headers()` — النسخة (1) صارت بنفس القيم حرفيًا |
+          | `get_profile` ثم `result.status == 1` | نفس الفحص داخل `connect()` |
+          | `loadStalkerCategories` (`type=itv&action=get_categories`) | `liveCategories()` |
+          | `loadStalkerChannels` (`get_ordered_list&category=<id>`) | `channels()` + مسار `category=` |
+          | `loadStalkerVodList` / `loadStalkerSeriesList` (`category=`) | `page()` — يجرب `genre=` ثم `category=` تلقائيًا |
+          | `loadStalkerSeriesInfo` (`js.series.<season>.series[]`) | `seriesTree()` |
+          | `playStalkerMovie`/`Episode` → `create_link` | `playable()` |
+          | الربط بالمشغل | `LiveActivity.play()` → `pendingPlayer()` (المشغل يظهر فورًا) → `startPlayback` |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -4114,7 +4128,8 @@ jobs:
                       m["User-Agent"] = UA_STB
                       m["X-User-Agent"] = "Model: MAG250; Link: WiFi"
                   } else {
-                      m["User-Agent"] = "Mozilla/5.0 (QtEmbedded; Linux; C) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36"
+                      // نفس قيم كود Java المجرَّب حرفيًا
+                      m["User-Agent"] = "Mozilla/5.0 (QtEmbedded; Linux; C)"
                       m["X-User-Agent"] = "Mozilla/5.0 (QtEmbedded; Linux; C)"
                   }
                   m["Referer"] = base + "/c/"
@@ -4373,7 +4388,10 @@ jobs:
                   if (live.isEmpty()) {
                       val cats = if (liveCats.isNotEmpty()) liveCats else liveCategories()
                       for (g in cats) {
-                          val r = req("type=itv&action=get_ordered_list&genre=" + Uri.encode(g.catId) + "&p=1") ?: continue
+                          var r = req("type=itv&action=get_ordered_list&genre=" + Uri.encode(g.catId) + "&p=1")
+                          if (r == null || itemsOf(r).length() == 0)
+                              r = req("type=itv&action=get_ordered_list&category=" + Uri.encode(g.catId) + "&p=1")
+                          if (r == null) continue
                           val arr = itemsOf(r)
                           for (i in 0 until arr.length()) {
                               val o = arr.optJSONObject(i) ?: continue
@@ -4417,12 +4435,21 @@ jobs:
                   return c
               }
 
+              /**
+               * صفحة قسم واحد. بعض البوابات تقبل `genre=` فقط (Stalker) وبعضها `category=` فقط
+               * (كما في كود Java الذي يستعمل get_ordered_list&category=<id>) — نجرب الاثنين.
+               */
               fun page(type: String, genreId: String, page: Int, search: String): String? {
+                  val tail = if (search.isNotBlank()) "&search=" + Uri.encode(search) else ""
                   var q = "type=$type&action=get_ordered_list&p=$page"
                   if (genreId.isNotBlank() && genreId != "0") q += "&genre=" + Uri.encode(genreId)
-                  if (search.isNotBlank()) q += "&search=" + Uri.encode(search)
-                  q += "&detailed=1&sortby=posted"
-                  return req(q)
+                  val r = req(q + tail + "&detailed=1&sortby=posted")
+                  if (r != null && itemsOf(r).length() > 0) return r
+                  if (genreId.isBlank() || genreId == "0") return r
+                  // إعادة المحاولة بصيغة category=
+                  val q2 = "type=$type&action=get_ordered_list&p=$page&category=" + Uri.encode(genreId)
+                  val r2 = req(q2 + tail + "&detailed=1&sortby=posted")
+                  return if (r2 != null && itemsOf(r2).length() > 0) r2 else r
               }
 
               fun fetchAll(kind: String, cats: List<Group>, out: MutableList<Channel>, maxPages: Int, budgetMs: Long, progress: (String) -> Unit): Int {
@@ -6458,7 +6485,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.10 (code 810)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.11 (code 811)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
