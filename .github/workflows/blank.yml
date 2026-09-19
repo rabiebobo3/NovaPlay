@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.11"
-      VERSION_CODE: "811"
+      VERSION_NAME: "8.13"
+      VERSION_CODE: "813"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 811)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.11")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 813)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.13")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -281,6 +281,24 @@ jobs:
           | `loadStalkerSeriesInfo` (`js.series.<season>.series[]`) | `seriesTree()` |
           | `playStalkerMovie`/`Episode` → `create_link` | `playable()` |
           | الربط بالمشغل | `LiveActivity.play()` → `pendingPlayer()` (المشغل يظهر فورًا) → `startPlayback` |
+
+          ## 8.12 — إصلاح سبب الخروج الحقيقي: شاشة المشغل كانت تطيح قبل أن تُفتح
+
+          | المشكلة | السبب الحقيقي (في الكود الأصلي منذ v8.6) | الإصلاح |
+          |---|---|---|
+          | الضغط على قناة/فلم يُخرج التطبيق، والمشغل لا يظهر | `pv.controllerAutoShow = !tv` كان يُنفَّذ **قبل** `bind()` التي تُعيَّن فيها `pv` → استثناء `lateinit property pv has not been initialized` في كل مرة تُفتح شاشة المشغل | `bind()` ولّت **أولًا** ثم إعدادات المتحكّم — سطران تبدّلا، لا شيء آخر |
+          | لأنه في كل مرة يفتح النظام شاشة المشغل كان التطبيق يطيح ويعيد التشغيل (CrashGuard) فتظهر الواجهة الرئيسية | لهذا: قناة → خروج، فلم → رجوع للواجهة الأولى، والمشغل لا يظهر أبدًا | الآن شاشة المشغل تُفتح وتشتغل |
+
+          (مع بقاء 8.7→8.11: دالة MAC Portal من كود Java، create_link، ترويسات Java، `category=`، حذف التكرار، الكاش المتدفق، الجلب في الخلفية.)
+
+          ## 8.13 — لا خروج من التطبيق: تهيئة الشاشات محميّة + إصلاح ترتيب المشغل
+
+          | العَرَض الذي تراه | السبب الحقيقي | الإصلاح |
+          |---|---|---|
+          | ضغط «بث مباشر» في الواجهة الأولى → التطبيق يخرج | `LiveActivity.onCreate` كانت تستعمل `pv` قبل `bind()` → استثناء فوري عند فتح شاشة المشغل | `bind()` أولًا (8.12) + كل `onCreate` في `try/catch` (8.13): لو حدث أي خطأ آخر يظهر «تعذر فتح المشغل: …» ويبقى التطبيق |
+          | فلم → يرجع للواجهة الأولى | نفس الاستثناء + معالج الأعطال يعيد تشغيل التطبيق إلى الواجهة الأولى | نفس الإصلاح |
+          | مسلسل → لا تظهر الحلقات | مسار الحلقات كان ينتهي بالمشغّل (الذي كان يطيح) — لذلك لا يظهر شي | المشغل صار يفتح + رسالة صريحة: «حُمّلت N حلقة» أو «اختر الموسم (M موسم)» + مسار احتياطي |
+          | — | حماية إضافية | أي استثناء في `onCreate` لأي شاشة يُسجّل في «سجل الأعطال» ويظهر كتنبيه بدل الخروج |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -1662,6 +1680,13 @@ jobs:
 
               override fun onCreate(b: Bundle?) {
                   super.onCreate(b)
+                  try { initScreen() } catch (t: Throwable) {
+                      Crash.log(t)
+                      try { toast("تعذر فتح الشاشة: " + (t.message ?: t.javaClass.simpleName)) } catch (e: Throwable) {}
+                  }
+              }
+
+              private fun initScreen() {
                   setContentView(R.layout.activity_grid)
                   goImmersive()
                   kind = intent.getStringExtra("kind") ?: "movie"
@@ -1853,7 +1878,9 @@ jobs:
                                   if (out.any { it.kind == "season" }) {
                                       // مواسم فقط: المستخدم يضغط الموسم ليُحمَّل
                                       seriesName = c.name
-                                      toast("اختر الموسم لتحميل حلقاته")
+                                      toast("اختر الموسم لتحميل حلقاته (${out.size} موسم)")
+                                  } else {
+                                      toast("حُمّلت ${out.size} حلقة")
                                   }
                                   applyFilter(); rvGrid.scrollToPosition(0)
                               } catch (t: Throwable) {
@@ -2163,14 +2190,24 @@ jobs:
 
               override fun onCreate(b: Bundle?) {
                   super.onCreate(b)
+                  // أي خطأ في تهيئة شاشة المشغل يظهر كرسالة — لا يخرج التطبيق أبدًا
+                  try {
+                      initScreen()
+                  } catch (t: Throwable) {
+                      Crash.log(t)
+                      try { toast("تعذر فتح المشغل: " + (t.message ?: t.javaClass.simpleName)) } catch (e: Throwable) {}
+                  }
+              }
+
+              private fun initScreen() {
                   tv = isTvDevice()
                   window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                   window.setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC)
                   setContentView(R.layout.activity_live)
                   goImmersive()
-                  pv.controllerAutoShow = !tv
+                  bind()                                     // ← أولًا: هنا تُعيَّن pv/pvFull وباقي العناصر
+                  pv.controllerAutoShow = !tv                // (كان قبل bind() → استثناء يفتح شاشة المشغل = طيّاح التطبيق)
                   pv.controllerShowTimeoutMs = if (tv) 2600 else 4200
-                  bind()
                   buildPlayer()
                   decodeChans(sp.s("favs"), favs)
                   decodeChans(sp.s("recents"), recents)
@@ -6485,7 +6522,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.11 (code 811)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.13 (code 813)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
