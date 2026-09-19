@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.10"
-      VERSION_CODE: "810"
+      VERSION_NAME: "8.16"
+      VERSION_CODE: "816"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 810)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.10")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 816)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.16")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -267,6 +267,66 @@ jobs:
           | عنصر بلا `cmd`؟ | نبني أمر جهاز MAG `http://localhost/ch/<id>_` من المعرّف ثم `create_link` (قناة/فلم/حلقة) |
           | الضغط → `actuallyPlayChannel` → المشغل يظهر ويشتغل | `play()` تفتح شاشة المشغل **فورًا** (`pendingPlayer`) ثم تُسند الرابط؛ الفشل يظهر **داخل المشغل** (`showPlayerError`) لا خروج |
           | ترويسات التشغيل: Cookie + Referer + UA + `Authorization: Bearer <token>` | `Stalker.playHeaders()` في `buildPlayer` (media3) |
+
+          ## 8.11 — دمج دوال MAC Portal من كود Java حرفيًا + الربط بالمشغل
+
+          | دالة كود Java | مكانها في هذا الكود |
+          |---|---|
+          | `fetchStalkerPortalData` (handshake) | `Stalker.connect()` (5 مسارات × نسختي ترويسات × 4 صيغ) |
+          | `Authorization: Bearer <token>` + `X-User-Agent: Mozilla/5.0 (QtEmbedded; Linux; C)` | `Stalker.headers()` — النسخة (1) صارت بنفس القيم حرفيًا |
+          | `get_profile` ثم `result.status == 1` | نفس الفحص داخل `connect()` |
+          | `loadStalkerCategories` (`type=itv&action=get_categories`) | `liveCategories()` |
+          | `loadStalkerChannels` (`get_ordered_list&category=<id>`) | `channels()` + مسار `category=` |
+          | `loadStalkerVodList` / `loadStalkerSeriesList` (`category=`) | `page()` — يجرب `genre=` ثم `category=` تلقائيًا |
+          | `loadStalkerSeriesInfo` (`js.series.<season>.series[]`) | `seriesTree()` |
+          | `playStalkerMovie`/`Episode` → `create_link` | `playable()` |
+          | الربط بالمشغل | `LiveActivity.play()` → `pendingPlayer()` (المشغل يظهر فورًا) → `startPlayback` |
+
+          ## 8.12 — إصلاح سبب الخروج الحقيقي: شاشة المشغل كانت تطيح قبل أن تُفتح
+
+          | المشكلة | السبب الحقيقي (في الكود الأصلي منذ v8.6) | الإصلاح |
+          |---|---|---|
+          | الضغط على قناة/فلم يُخرج التطبيق، والمشغل لا يظهر | `pv.controllerAutoShow = !tv` كان يُنفَّذ **قبل** `bind()` التي تُعيَّن فيها `pv` → استثناء `lateinit property pv has not been initialized` في كل مرة تُفتح شاشة المشغل | `bind()` ولّت **أولًا** ثم إعدادات المتحكّم — سطران تبدّلا، لا شيء آخر |
+          | لأنه في كل مرة يفتح النظام شاشة المشغل كان التطبيق يطيح ويعيد التشغيل (CrashGuard) فتظهر الواجهة الرئيسية | لهذا: قناة → خروج، فلم → رجوع للواجهة الأولى، والمشغل لا يظهر أبدًا | الآن شاشة المشغل تُفتح وتشتغل |
+
+          (مع بقاء 8.7→8.11: دالة MAC Portal من كود Java، create_link، ترويسات Java، `category=`، حذف التكرار، الكاش المتدفق، الجلب في الخلفية.)
+
+          ## 8.13 — لا خروج من التطبيق: تهيئة الشاشات محميّة + إصلاح ترتيب المشغل
+
+          | العَرَض الذي تراه | السبب الحقيقي | الإصلاح |
+          |---|---|---|
+          | ضغط «بث مباشر» في الواجهة الأولى → التطبيق يخرج | `LiveActivity.onCreate` كانت تستعمل `pv` قبل `bind()` → استثناء فوري عند فتح شاشة المشغل | `bind()` أولًا (8.12) + كل `onCreate` في `try/catch` (8.13): لو حدث أي خطأ آخر يظهر «تعذر فتح المشغل: …» ويبقى التطبيق |
+          | فلم → يرجع للواجهة الأولى | نفس الاستثناء + معالج الأعطال يعيد تشغيل التطبيق إلى الواجهة الأولى | نفس الإصلاح |
+          | مسلسل → لا تظهر الحلقات | مسار الحلقات كان ينتهي بالمشغّل (الذي كان يطيح) — لذلك لا يظهر شي | المشغل صار يفتح + رسالة صريحة: «حُمّلت N حلقة» أو «اختر الموسم (M موسم)» + مسار احتياطي |
+          | — | حماية إضافية | أي استثناء في `onCreate` لأي شاشة يُسجّل في «سجل الأعطال» ويظهر كتنبيه بدل الخروج |
+
+          ## 8.14 — القنوات تشتغل + الأفلام ملء الشاشة + المسلسل يبيّن المواسم والحلقات
+
+          | ما لاحظته | السبب | الإصلاح (بنفس كود Java) |
+          |---|---|---|
+          | القناة المباشرة لا تشتغل (NETWORK_FAILED) | كنتُ أمرّر القناة على `create_link` والبوابة ترجع رابطًا غير شغّال | **مثل كود Java**: `playChannel` يشغّل `cmd` القناة مباشرة. الآن القناة تُشغَّل برابطها مباشرة، و`create_link` للأفلام/الحلقات فقط — **وإذا فشل رابط القناة نجرّب `create_link` تلقائيًا مرة واحدة** |
+          | الفلم يظهر بمشغل صغير | `toggleFull` كانت تُنادى فقط عند `asFull` | **مثل كود Java** (`if (doubleClick \|\| !isLive) toggleFull(true)`): كل فلم/حلقة تُفتح **ملء الشاشة** |
+          | الصورة لا تملأ الشاشة | `RESIZE_MODE_FIT` | نمط حجم الصورة محفوظ: **تكبير يملأ الشاشة** (افتراضي) + خيار في الإعدادات السريعة: ملاءمة / تكبير / تمديد — وضغطة طويلة على زر التوسيع تبدّل مباشرة |
+          | المسلسل يبيّن حلقات بدل المواسم | الشجرة كانت تُفرّغ الحلقات داخل القائمة | **مثل كود Java** (`findOrCreateStalkerSeasonFolder`): الشجرة تُنتج **بطاقة لكل موسم** («موسم 1 • 4 حلقة»)، والضغط على الموسم يجيب حلقاته (`fetchStalkerEpisodes`: 3 صيغ لطلب الحلقات) |
+
+          ## 8.15 — المشغل الكبير يملأ الشاشة + المواسم والحلقات من كود Java حرفيًا
+
+          | ما طلبتَه | ما صار في الكود |
+          |---|---|
+          | الأفلام/المسلسلات بمشغل **كبير يملأ الشاشة** | `toggleFull(true)` تُنادى **قبل** تجهيز المشغّل، وإسناد المشغّل للمشهد الكبير مباشرة (`pvFull.player = p`) بدل `switchTargetView` — أضمن على كل الأجهزة. البطاقة الصغيرة (`pipBox`) وصندوق القناة لا يظهران فوق المشغل الكامل، والصورة بنمط **تكبير يملأ الشاشة** |
+          | المواسم لا تظهر | `seriesTree` = نفس `fetchStalkerSeriesTree`: 3 صيغ للرابط بـ `force_ch_link_check=1`، ثم `processStalkerSeriesItems` بنفس شروطه (is_season / season_number / مجلد موسم / حلقة مباشرة) → بطاقات مواسم («موسم 1 • 4 حلقة») |
+          | الحلقات لا تظهر | `seasonEpisodes` = نفس `fetchStalkerEpisodes`: 3 صيغ للرابط (movie_id، movie_id=series:series، +season_id) + مطابقة الموسم `isSameMacPortalSeason` بالحرف (بما فيها صيغة `series:season`) + قراءة `server.series[]` + خازن الحلقات المدمجة (بلا طلب إضافي) |
+          | مؤشرات فارغة/بطاقة صغيرة | `looksLikeSeason`: بطاقة الموسم لا تُعتبر حلقة (كانت تتحول لحلقات وهمية) |
+
+          ## 8.16 — صورة مضبوطة + رجوع للقسم + مواسم وحلقات منظّمة
+
+          | ما طلبتَه | السبب الحقيقي | ما صار في الكود |
+          |---|---|---|
+          | **الصورة غير مضبوطة على الهاتف** | `toggleFull` كانت تعتمد `switchTargetView`، ووضع الصورة كان «تمديد/FILL» في القالب + خيار «تكبير» افتراضيًا (يقصّ الصورة) | وضع جديد **«ملاءمة مضبوطة»** (لا شدّ ولا قصّ) هو الافتراضي، ولا يتغيّر إلا بضغطة مطوّلة على «توسيع»: ملاءمة ← تكبير يملأ ← **16:9 ثابتة** ← تمديد ← 4:3. ولما يُرسل السرفر أبعادًا مقلوبة (عمودي 1080×1920) والعرض أفقي ⇒ **تصحيح تلقائي** إلى 16:9 |
+          | **الشعار والشريط فوق الصورة** | شريط علوي ثابت فيه الشعار والعنوان والجودة | الشريط العلوي والسفلي **يختفيان معًا** بعد ثوانٍ ويظهران بضغطة على الشاشة — الصورة نظيفة ملء الشاشة |
+          | **الرجوع من المشغل يرجع للمسكن** | `LiveActivity` كانت `launchMode=singleTask` ⇒ الروبوت **يقتل شاشة الأفلام/المسلسلات** عند فتح المشغل، فيرجع المستخدم للمسكن | `singleTop` + `from=grid`: الرجوع (أو «إغلاق») يرجّع **نفس القسم ونفس العنصر** مُحدَّدًا بعلامة ▶ وبنفس موضع التمرير، والقائمة تُمرَّر معه فتعمل «التالي/السابق» داخل **الحلقات** |
+          | **المواسم والحلقات غير منظّمة/غير دقيقة** | نفس الموسم كان يصل بأشكال مختلفة (`id=1` / `season_id=1` / «Season 1») ⇒ بطاقات مكرّرة، والحلقات بترتيب السرفر المبعثر ومكرّرة | مفتاح موسم موحّد (`normSeasonKey`) يدمج المكرّر في بطاقة واحدة، **ترتيب رقمي** للمواسم (1،2،10) والحلقات (من الاسم أو `episode_number`)، وحذف التكرار، وعدد الحلقات الحقيقي في البطاقة |
+          | **متابعة المشاهدة** | دالة `showResumeDialog` في كود Java ما كانتش موجودة | تُحفظ ثانية التوقف لكل فيلم/حلقة، وعند إعادة التشغيل تسألك: «متابعة من الفيلم السابق؟» أو «من البداية» |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -433,7 +493,7 @@ jobs:
 
                   <activity
                       android:name=".LiveActivity"
-                      android:launchMode="singleTask"
+                      android:launchMode="singleTop"
                       android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode|locale|layoutDirection"
                       android:exported="false"
                       android:screenOrientation="sensorLandscape"
@@ -1634,6 +1694,12 @@ jobs:
               private var inEpisodes = false
               private var seriesName = ""
               private var macLocal = false
+
+              /* v8.16: آخر عنصر شُغّل — نرجّع الشبكة عليه بنفس الموضع بعد الرجوع من المشغل */
+              private var lastPlayedId = ""
+              private var lastPlayedUrl = ""
+              private var lastName = ""
+              private var pendingScroll = false
               private var evRec: android.content.BroadcastReceiver? = null
               private val saved = ArrayList<Channel>()
               private val favs = ArrayList<Channel>()
@@ -1648,6 +1714,13 @@ jobs:
 
               override fun onCreate(b: Bundle?) {
                   super.onCreate(b)
+                  try { initScreen() } catch (t: Throwable) {
+                      Crash.log(t)
+                      try { toast("تعذر فتح الشاشة: " + (t.message ?: t.javaClass.simpleName)) } catch (e: Throwable) {}
+                  }
+              }
+
+              private fun initScreen() {
                   setContentView(R.layout.activity_grid)
                   goImmersive()
                   kind = intent.getStringExtra("kind") ?: "movie"
@@ -1839,7 +1912,9 @@ jobs:
                                   if (out.any { it.kind == "season" }) {
                                       // مواسم فقط: المستخدم يضغط الموسم ليُحمَّل
                                       seriesName = c.name
-                                      toast("اختر الموسم لتحميل حلقاته")
+                                      toast("اختر الموسم لتحميل حلقاته (${out.size} موسم)")
+                                  } else {
+                                      toast("حُمّلت ${out.size} حلقة")
                                   }
                                   applyFilter(); rvGrid.scrollToPosition(0)
                               } catch (t: Throwable) {
@@ -1897,8 +1972,44 @@ jobs:
                   i.putExtra("title", c.name)
                   i.putExtra("kind", c.kind.ifBlank { if (kind == "movie") "movie" else "series" })
                   i.putExtra("chan", c.toJson().toString())
-                  i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                  // v8.16: الرجوع من المشغل يرجع **نفس القسم ونفس العنصر**، والقائمة تُمكّن «التالي/السابق» داخل الحلقات
+                  i.putExtra("from", "grid")
+                  try {
+                      val list = ArrayList<Channel>()
+                      val idx = items.indexOfFirst { sameItem(it, c) }
+                      val from = if (idx > 120) idx - 120 else 0
+                      val to = Math.min(items.size, from + 240)
+                      for (k in from until to) list.add(items[k])
+                      if (list.isNotEmpty()) {
+                          i.putExtra("plist", encodeChans(list))
+                          i.putExtra("ppos", idx - from)
+                      }
+                  } catch (t: Throwable) { Crash.log(t) }
+                  lastPlayedId = c.id
+                  lastPlayedUrl = if (c.url.isNotBlank()) c.url else c.alt
+                  lastName = c.name
+                  pendingScroll = true
+                  i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                   try { startActivity(i) } catch (t: Throwable) { toast("تعذّر فتح المشغّل: " + (t.message ?: "")) }
+              }
+
+              private fun sameItem(a: Channel, b: Channel): Boolean {
+                  if (a.url.isNotBlank() && a.url == b.url) return true
+                  return a.id.isNotBlank() && a.id == b.id && a.name == b.name
+              }
+
+              /** يرجّع الشبكة على آخر عنصر شُغّل (نفس الموضع) — يشتغل عند الرجوع من المشغل. */
+              private fun scrollToLast() {
+                  try {
+                      val i = items.indexOfFirst {
+                          (lastPlayedUrl.isNotBlank() && it.url == lastPlayedUrl) ||
+                          (lastPlayedId.isNotBlank() && it.id == lastPlayedId && it.name == lastName)
+                      }
+                      if (i >= 0) {
+                          rvGrid.scrollToPosition(i)
+                          adapter.notifyDataSetChanged()
+                      }
+                  } catch (t: Throwable) { Crash.log(t) }
               }
 
               private fun back() {
@@ -1916,6 +2027,10 @@ jobs:
               override fun onResume() {
                   super.onResume()
                   goImmersive()
+                  if (pendingScroll) {                    // رجعنا من المشغل: نفس القسم ونفس العنصر
+                      pendingScroll = false
+                      try { rvGrid.post { scrollToLast() } } catch (t: Throwable) { Crash.log(t) }
+                  }
                   evRec = Events.register(this) { type, _ ->
                       if (type == "catalog") runOnUiThread {
                           try { softRefresh() } catch (t: Throwable) { Crash.log(t) }
@@ -1967,7 +2082,9 @@ jobs:
 
                   override fun onBindViewHolder(h: CardH, i: Int) {
                       val c = items[i]
-                      h.name.text = c.name
+                      val isLast = (lastPlayedUrl.isNotBlank() && c.url == lastPlayedUrl) ||
+                          (lastPlayedId.isNotBlank() && c.id == lastPlayedId && c.name == lastName)
+                      h.name.text = if (isLast) "▶ " + c.name else c.name
                       if (inEpisodes) {
                           h.badge.text = c.group
                           h.badge.visibility = if (c.group.isBlank()) View.GONE else View.VISIBLE
@@ -1984,7 +2101,7 @@ jobs:
                           } catch (t: Throwable) { h.img.setImageResource(img) }
                       } else h.img.setImageResource(img)
                       val isFav = favs.any { it.url == c.url && c.url.isNotBlank() }
-                      h.name.setTextColor(ContextCompat.getColor(this@GridActivity, if (isFav) R.color.np_gold else R.color.np_text))
+                      h.name.setTextColor(ContextCompat.getColor(this@GridActivity, if (isFav || isLast) R.color.np_gold else R.color.np_text))
                       h.itemView.setOnClickListener { openSafe(c) }
                       h.itemView.setOnLongClickListener {
                           pickDialog(c.name, listOf("▶ تشغيل", "★ مفضلة", "ⓘ معلومات")) { k ->
@@ -2092,6 +2209,14 @@ jobs:
               private var retries = 0
               private var full = false
               private var pipOn = false
+
+              /* v8.16: رجوع للقسم بنفس الموضع + قائمة القسم/الحلقات + نسبة صورة مضبوطة + متابعة المشاهدة */
+              private var fromGrid = false
+              private val plist = ArrayList<Channel>()
+              private var lastW = 0
+              private var lastH = 0
+              private var resumeAsk = 0L
+              private var topBar: View? = null
               private var userSeeking = false
               private var listMode = "all"          // all | fav | recent | mine | lock | group
               private var curGroup = "ALL"
@@ -2149,14 +2274,24 @@ jobs:
 
               override fun onCreate(b: Bundle?) {
                   super.onCreate(b)
+                  // أي خطأ في تهيئة شاشة المشغل يظهر كرسالة — لا يخرج التطبيق أبدًا
+                  try {
+                      initScreen()
+                  } catch (t: Throwable) {
+                      Crash.log(t)
+                      try { toast("تعذر فتح المشغل: " + (t.message ?: t.javaClass.simpleName)) } catch (e: Throwable) {}
+                  }
+              }
+
+              private fun initScreen() {
                   tv = isTvDevice()
                   window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                   window.setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC)
                   setContentView(R.layout.activity_live)
                   goImmersive()
-                  pv.controllerAutoShow = !tv
+                  bind()                                     // ← أولًا: هنا تُعيَّن pv/pvFull وباقي العناصر
+                  pv.controllerAutoShow = !tv                // (كان قبل bind() → استثناء يفتح شاشة المشغل = طيّاح التطبيق)
                   pv.controllerShowTimeoutMs = if (tv) 2600 else 4200
-                  bind()
                   buildPlayer()
                   decodeChans(sp.s("favs"), favs)
                   decodeChans(sp.s("recents"), recents)
@@ -2167,6 +2302,7 @@ jobs:
                   rvGroups.adapter = grpAdapter
                   selectGroup(groups.firstOrNull() ?: Group().apply { name = "ALL"; special = "all" })
                   setupCast()
+                  readExtraRoute()
                   val direct = intent.getStringExtra("play")
                   val chanExtra = intent.getStringExtra("chan")
                   if (!direct.isNullOrBlank() || !chanExtra.isNullOrBlank()) {
@@ -2198,6 +2334,7 @@ jobs:
               }
 
               override fun onPause() {
+                  savePosNow()
                   Events.unregister(this, receiver); receiver = null
                   try { pv.keepScreenOn = false } catch (t: Throwable) {}
                   super.onPause()
@@ -2211,6 +2348,7 @@ jobs:
               override fun onNewIntent(i: Intent?) {
                   super.onNewIntent(i)
                   intent = i
+                  readExtraRoute()
                   val direct = i?.getStringExtra("play")
                   val chanExtra = i?.getStringExtra("chan")
                   if (!direct.isNullOrBlank() || !chanExtra.isNullOrBlank()) {
@@ -2225,6 +2363,7 @@ jobs:
               }
 
               override fun onDestroy() {
+                  savePosNow()
                   stopTicker(); clearWd()
                   try { player?.removeListener(this) } catch (t: Throwable) {}
                   try { player?.release() } catch (t: Throwable) {}
@@ -2285,6 +2424,7 @@ jobs:
                   player = p
                   pv.player = p
                   pv.useController = true
+                  applyResize()
                   p.addListener(this)
               }
 
@@ -2301,10 +2441,12 @@ jobs:
 
               /** رقم آخر ضغطة: أي رد قديم (قناة سابقة) لا يقطع تشغيل ما ضغط عليه المستخدم للتو. */
               private var playSeq = 0
+              private var resolvedLive = false
 
               private fun play(c: Channel, full0: Boolean) {
                   playSeq++
                   val mySeq = playSeq
+                  savePosNow()                      // نحفظ موضع العنصر السابق قبل الانتقال
                   stopAllPlayback()
                   cur = c
                   retries = 0
@@ -2317,6 +2459,13 @@ jobs:
                   if (p?.type == "mac") {
                       if (url.isBlank()) url = Stalker.localCmd(c.id.ifBlank { c.mid })   // أمر MAG من المعرّف
                       if (url.isBlank()) { toast("لا يوجد أمر تشغيل لهذا العنصر"); return }
+                      // مثل كود Java: القناة المباشرة رابطها جاهز → تُشغَّل مباشرة بلا create_link
+                      if (c.kind == "live" && directUrl(url)) {
+                          resolvedLive = false
+                          c.url = url
+                          startPlayback(c, url, full0)
+                          return
+                      }
                       val cmd0 = url
                       pendingPlayer(c, full0, "جارٍ تجهيز رابط البوابة…")
                       Loader.macPlayable(p, c.kind, cmd0, c.mid, c.sid, c.id) { u ->
@@ -2342,6 +2491,14 @@ jobs:
                   startPlayback(c, url, full0)
               }
 
+              /** رابط قابل للتشغيل مباشرة (ليس أمر بوابة محلي ولا رابطًا نسبيًا). */
+              private fun directUrl(u: String): Boolean {
+                  if (u.isBlank()) return false
+                  val l = u.lowercase()
+                  if (l.contains("localhost") || l.contains("127.0.0.1")) return false
+                  return l.startsWith("http://") || l.startsWith("https://") || l.startsWith("rtsp") || l.startsWith("udp") || l.startsWith("rtmp")
+              }
+
               /** يفتح شاشة المشغل فورًا (عنوان + شريط تحميل) قبل ما يوصل الرابط. */
               private fun pendingPlayer(c: Channel, asFull: Boolean, msg: String) {
                   try {
@@ -2351,7 +2508,7 @@ jobs:
                           when (c.kind) { "live" -> "بث مباشر"; "movie" -> "فيلم"; "series" -> "مسلسل"; "episode" -> "حلقة"; else -> c.kind }
                       ).joinToString(" • ")
                       infoDesc.text = c.extra.ifBlank { "بانتظار البيانات…" }
-                      if (asFull && !full) toggleFull(true)
+                      if ((asFull || c.kind != "live") && !full) toggleFull(true)
                       dockBusy.visibility = View.VISIBLE; fullBusy.visibility = View.VISIBLE
                       tvLoadTxt.text = msg; tvFullPct.text = ""; tvLoadPct.text = ""
                       wdBar.visibility = View.GONE
@@ -2414,19 +2571,20 @@ jobs:
                   val meta = MediaMetadata.Builder().setTitle(c.name).build()
                   val item = MediaItem.Builder().setUri(url).setMediaMetadata(meta)
                       .setMimeType(mime).setTag(c.name).build()
+                  // نفس كود Java: الأفلام/الحلقات تُفتح ملء الشاشة — نُجهّز المشهد الكبير **قبل** التشغيل
+                  if ((asFull || c.kind != "live") && !full) toggleFull(true)
+                  resumeAsk = if (c.kind == "live") 0L else savedPosOf(c)     // متابعة المشاهدة (showResumeDialog)
                   p.stop()
                   p.setMediaItem(item)
                   p.prepare()
                   p.playWhenReady = true
-                  pv.player = p
-                  if (full) pvFull.player = p
-                  if (asFull && !full) toggleFull(true)
+                  if (full) { try { pvFull.player = p } catch (t: Throwable) { pv.player = p } } else pv.player = p
                   if (!full) { dockBusy.visibility = View.VISIBLE; tvLoadPct.text = "0%" }
                   else { fullBusy.visibility = View.VISIBLE; tvFullPct.text = "0%" }
                   armWd()
                   fetchEpg(c)
                   chanAdapter.notifyDataSetChanged()
-                  showPip(true)
+                  showPip(!full)                     // ما نُظهرش البطاقة الصغيرة فوق المشغل الكبير
               }
 
               private fun playAlt() {
@@ -2445,17 +2603,77 @@ jobs:
                   val p = player ?: return
                   if (on) {
                       fullBox.visibility = View.VISIBLE
+                      try { findViewById<View>(R.id.playerHolder)?.visibility = View.GONE } catch (t: Throwable) {}
+                      showPip(false)
                       goImmersive()
-                      try { PlayerView.switchTargetView(p, pv, pvFull) } catch (t: Throwable) { Crash.log(t) }
-                      pvFull.resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT
+                      // إسناد المشغّل للمشهد الكبير مباشرة (أضمن من switchTargetView على كل الأجهزة)
+                      try { pvFull.player = p } catch (t: Throwable) { Crash.log(t) }
+                      try { pv.player = null } catch (t: Throwable) { Crash.log(t) }
+                      applyResize()
+                      try { pvFull.requestLayout() } catch (t: Throwable) {}
                       pvFull.useController = false
                       fullTitle.text = cur?.name ?: ""
                       findViewById<View>(R.id.fullBar)?.requestFocus()
                       hideBarsSoon()
                   } else {
                       fullBox.visibility = View.GONE
-                      try { PlayerView.switchTargetView(p, pvFull, pv) } catch (t: Throwable) { Crash.log(t) }
+                      try { findViewById<View>(R.id.playerHolder)?.visibility = View.VISIBLE } catch (t: Throwable) {}
+                      try { pv.player = p } catch (t: Throwable) { Crash.log(t) }
+                      try { pvFull.player = null } catch (t: Throwable) { Crash.log(t) }
                   }
+              }
+
+              /**
+               * نسبة الصورة (v8.16): 0 ملاءمة مضبوطة (افتراضي — لا شدّ ولا قصّ)، 1 تكبير يملأ الشاشة،
+               * 2 تمديد، 3 نسبة 16:9 ثابتة، 4 نسبة 4:3 ثابتة (تُصلح بيانات السرفر المقلوبة).
+               */
+              private fun applyResize() {
+                  val mode = sp.s("rm2", "0")
+                  val af = androidx.media3.ui.AspectRatioFrameLayout
+                  val rm = when (mode) {
+                      "1" -> af.RESIZE_MODE_ZOOM
+                      "2" -> af.RESIZE_MODE_FILL
+                      else -> af.RESIZE_MODE_FIT
+                  }
+                  val ratio = when (mode) { "3" -> 16f / 9f; "4" -> 4f / 3f; else -> 0f }
+                  try { applyBox(pv, rm, ratio) } catch (t: Throwable) { Crash.log(t) }
+                  try { applyBox(pvFull, rm, ratio) } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              /** يضبط صندوق المشغل: ملء الشاشة، أو نسبة ثابتة في وسط الشاشة (لتصحيح بيانات السرفر). */
+              private fun applyBox(v: PlayerView, rm: Int, ratio: Float) {
+                  try { v.resizeMode = rm } catch (t: Throwable) {}
+                  val parent = v.parent as? View ?: return
+                  val lp = v.layoutParams as? FrameLayout.LayoutParams ?: return
+                  if (ratio > 0f) {
+                      var pw = parent.width
+                      var ph = parent.height
+                      if (pw <= 0 || ph <= 0) {
+                          pw = resources.displayMetrics.widthPixels
+                          ph = resources.displayMetrics.heightPixels
+                      }
+                      var w = pw
+                      var hh = (pw / ratio).toInt()
+                      if (hh > ph) { hh = ph; w = (ph * ratio).toInt() }
+                      if (w <= 0 || hh <= 0) return
+                      lp.width = w
+                      lp.height = hh
+                      lp.gravity = android.view.Gravity.CENTER
+                  } else {
+                      lp.width = FrameLayout.LayoutParams.MATCH_PARENT
+                      lp.height = FrameLayout.LayoutParams.MATCH_PARENT
+                      lp.gravity = android.view.Gravity.CENTER
+                  }
+                  try { v.layoutParams = lp } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              private fun cycleResize() {
+                  val order = listOf("0", "1", "3", "2", "4")
+                  val i = order.indexOf(sp.s("rm2", "0")).let { if (it < 0) 0 else it }
+                  val nxt = order[(i + 1) % order.size]
+                  sp.put("rm2", nxt)
+                  applyResize()
+                  toast("نسبة الصورة: " + ratioLabel(nxt))
               }
 
               private fun hideBarsSoon() {
@@ -2463,18 +2681,107 @@ jobs:
                   h.postDelayed(hideBar, if (tv) 2600 else 4000)
               }
 
-              private val hideBar = Runnable {
-                  if (full && player?.isPlaying == true) {
-                      val bar = findViewById<View>(R.id.fullBar)
-                      bar.animate().alpha(0f).setDuration(250).withEndAction { bar.visibility = View.GONE }.start()
+              /** يُظهر/يُخفي الشريطين (العلوي بالعنوان والشعار + السفلي) معًا — صورة نظيفة ملء الشاشة. */
+              private fun fadeBars(show: Boolean) {
+                  val bar = try { findViewById<View>(R.id.fullBar) } catch (t: Throwable) { null }
+                  val top = topBar
+                  for (v in listOfNotNull(bar, top)) {
+                      try {
+                          if (show) {
+                              v.visibility = View.VISIBLE
+                              v.animate().alpha(1f).setDuration(150).start()
+                          } else {
+                              v.animate().alpha(0f).setDuration(220).withEndAction { v.visibility = View.GONE }.start()
+                          }
+                      } catch (t: Throwable) {}
                   }
               }
 
+              private val hideBar = Runnable {
+                  try { if (full && player?.isPlaying == true) fadeBars(false) } catch (t: Throwable) {}
+              }
+
               private fun showBars() {
-                  val bar = findViewById<LinearLayout>(R.id.fullBar)
-                  bar.visibility = View.VISIBLE
-                  bar.alpha = 1f
+                  fadeBars(true)
                   hideBarsSoon()
+              }
+
+              /* ===================== v8.16: رجوع للقسم + نسبة الصورة + متابعة ===================== */
+
+              /**
+               * مسار التشغيل: هل جاء من قسم الأفلام/المسلسلات؟ ومعها قائمة القسم/الحلقات
+               * حتى يعمل «التالي/السابق» داخل نفس القسم أو داخل حلقات المسلسل.
+               */
+              private fun readExtraRoute() {
+                  try {
+                      fromGrid = (intent?.getStringExtra("from") ?: "") == "grid"
+                      plist.clear()
+                      val raw = intent?.getStringExtra("plist")
+                      if (!raw.isNullOrBlank()) decodeChans(raw, plist)
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              /** قائمة التشغيل الحالية: قائمة القسم/الحلقات لو جاي من الشبكة، وإلا قنوات الشاشة. */
+              private fun pl(): List<Channel> = if (plist.isNotEmpty()) plist else shown
+
+              private fun sameChan(a: Channel, b: Channel?): Boolean {
+                  if (b == null) return false
+                  if (a.url.isNotBlank() && a.url == b.url) return true
+                  return a.id.isNotBlank() && a.id == b.id && a.name == b.name
+              }
+
+              private fun plIndex(): Int = pl().indexOfFirst { sameChan(it, cur) }
+
+              /** مفتاح حفظ موضع المشاهدة لكل عنصر (فيلم/حلقة). */
+              private fun keyOf(c: Channel?): String {
+                  if (c == null) return ""
+                  val u = if (c.url.isNotBlank()) c.url else c.alt
+                  if (u.isNotBlank()) return "u" + Integer.toHexString(u.hashCode())
+                  return if (c.id.isNotBlank()) "i" + c.id else ""
+              }
+
+              private fun savedPosOf(c: Channel): Long {
+                  val k = keyOf(c)
+                  if (k.isBlank()) return 0L
+                  return sp.s("pos_" + k).toLongOrNull() ?: 0L
+              }
+
+              private fun clearPosOf(c: Channel?) {
+                  val k = keyOf(c)
+                  if (k.isNotBlank()) sp.put("pos_" + k, "")
+              }
+
+              /** يحفظ الموضع الحالي (يُستعمل في الرجوع/الخروج) — نفس استئناف المشاهدة في كود Java. */
+              private fun savePosNow() {
+                  try {
+                      val c = cur ?: return
+                      if (c.kind == "live") return
+                      val k = keyOf(c)
+                      if (k.isBlank()) return
+                      val pos = player?.currentPosition ?: return
+                      sp.put("pos_" + k, if (pos > 15000L) pos.toString() else "")
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              /** نافذة «متابعة المشاهدة» — نفس `showResumeDialog` في كود Java. */
+              private fun askResume(pos: Long) {
+                  try {
+                      AlertDialog.Builder(this)
+                          .setTitle("متابعة المشاهدة")
+                          .setMessage("شاهدت هذا العنصر سابقًا حتى " + fmtTime(pos) + " — تريد المتابعة من هناك؟")
+                          .setPositiveButton("متابعة") { _, _ -> try { player?.seekTo(pos); player?.play() } catch (t: Throwable) {} }
+                          .setNegativeButton("من البداية") { _, _ -> clearPosOf(cur) }
+                          .show()
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              /** اسم نسبة الصورة الحالية (تظهر في الإعدادات وفي التنبيه). */
+              private fun ratioLabel(m: String): String = when (m) {
+                  "1" -> "تكبير يملأ الشاشة"
+                  "2" -> "تمديد"
+                  "3" -> "16:9 ثابتة (لبيانات مقلوبة)"
+                  "4" -> "4:3 ثابتة"
+                  else -> "ملاءمة مضبوطة"
               }
 
               /* ================================ SmartLoad ================================ */
@@ -2495,14 +2802,23 @@ jobs:
                           val vod = dur > 0 && dur != C.TIME_UNSET
                           dockSeek.visibility = if (vod) View.VISIBLE else View.GONE
                           val bar = findViewById<LinearLayout>(R.id.fullBar)
+                          bar.alpha = 1f
+                          if (topBar != null) topBar!!.alpha = 1f
                           bar.visibility = if (vod) View.VISIBLE else View.INVISIBLE
+                          if (full) hideBarsSoon()
                           sbDock.max = (dur / 1000).toInt().coerceAtLeast(0)
                           sbFull.max = sbDock.max
                           tvDur.text = fmtTime(dur)
                           tvFullDur.text = fmtTime(dur)
                           if (vod && infoDesc.text.toString().startsWith("بانتظار")) infoDesc.text = descOf(cur)
+                          if (resumeAsk > 60000L && dur > resumeAsk + 30000L) {
+                              val rp = resumeAsk
+                              resumeAsk = 0L
+                              askResume(rp)
+                          } else resumeAsk = 0L
                       }
                       Player.STATE_ENDED -> {
+                          clearPosOf(cur)
                           dockBusy.visibility = View.GONE; fullBusy.visibility = View.GONE
                           if (autoNext) next(true) else toast("انتهى العرض")
                       }
@@ -2519,7 +2835,22 @@ jobs:
               }
 
               override fun onVideoSizeChanged(size: VideoSize) {
-                  fullQual.text = if (size.width > 0) "${size.width}×${size.height}" else ""
+                  var w = size.width
+                  var h = size.height
+                  val rot = size.unappliedRotationDegrees
+                  if (rot == 90 || rot == 270) { val t = w; w = h; h = t }
+                  lastW = w; lastH = h
+                  fullQual.text = if (w > 0 && h > 0) "$w×$h" else ""
+                  // تصحيح تلقائي: السرفر يرسل الأبعاد مقلوبة (عمودي) والصورة أفقية ⇒ الصورة تبدو مشدودة
+                  try {
+                      val land = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                      val fix = Stalker.autoAspect(w, h, land)
+                      if (fix != null && sp.s("rm2", "0") == "0") {
+                          sp.put("rm2", fix)
+                          applyResize()
+                          toast("نسبة الصورة من السرفر غير مضبوطة — صُحّحت تلقائيًا (16:9). ضغطة مطوّلة على «توسيع» لتغييرها")
+                      }
+                  } catch (t: Throwable) { Crash.log(t) }
               }
 
               override fun onPlayerError(e: PlaybackException) {
@@ -2528,6 +2859,20 @@ jobs:
                   val smartAlt = sp.b("smart_alt", true)
                   val canAlt = !usingAlt && smartAlt && (cur?.alt?.isNotBlank() == true) && cur?.alt != cur?.url
                   val msg = e.errorCodeName
+                  // قناة MAC مباشرة فشل رابطها؟ نجرّب create_link مرة واحدة (احتياطي ذكي)
+                  val pm = Catalog.profile
+                  if (!resolvedLive && pm?.type == "mac" && cur?.kind == "live" && pm != null) {
+                      resolvedLive = true
+                      val ch = cur ?: return
+                      busy(true, "تجربة مسار البوابة (create_link)…")
+                      Loader.macPlayable(pm, "live", ch.url, ch.mid, ch.sid, ch.id) { u ->
+                          busy(false, "")
+                          if (u.isNotBlank() && u != ch.url) { ch.url = u; startPlayback(ch, u, full) } else {
+                              tvWd.text = "فشل التشغيل: $msg"; wdBar.visibility = View.VISIBLE
+                          }
+                      }
+                      return
+                  }
                   if (canAlt) { playAlt(); return }
                   if (retries <= 3) {
                       val wait = 700L * retries
@@ -2745,22 +3090,25 @@ jobs:
               }
 
               private fun next(auto: Boolean) {
-                  if (shown.isEmpty()) return
-                  val i = indexOf(cur)
+                  val list = pl()
+                  if (list.isEmpty()) return
+                  val fromList = plist.isNotEmpty()
+                  val i = if (fromList) plIndex() else indexOf(cur)
                   var n = i + 1
-                  if (n >= shown.size) {
-                      if (!auto) { toast("هذه آخر قناة"); return }
+                  if (n >= list.size) {
+                      if (!auto) { toast(if (fromList) "هذه آخر حلقة" else "هذه آخر قناة"); return }
                       n = 0
                   }
-                  play(shown[n], full)
+                  play(list[n], full)
               }
 
               private fun prev() {
-                  if (shown.isEmpty()) return
-                  val i = indexOf(cur)
+                  val list = pl()
+                  if (list.isEmpty()) return
+                  val i = if (plist.isNotEmpty()) plIndex() else indexOf(cur)
                   var n = i - 1
-                  if (n < 0) n = shown.size - 1
-                  play(shown[n], full)
+                  if (n < 0) n = list.size - 1
+                  play(list[n], full)
               }
 
               /* ================================ EPG / القبض ================================ */
@@ -2898,7 +3246,8 @@ jobs:
                       "معلومات الجلسة والحساب",
                       "تغيير رمز القفل",
                       "مسح السجل",
-                      "عمق الجلب (أفلام/مسلسلات): " + depthLabel()
+                      "عمق الجلب (أفلام/مسلسلات): " + depthLabel(),
+                      "نسبة الصورة: " + ratioLabel(sp.s("rm2", "0"))
                   )
                   pickDialog("الإعدادات السريعة", items) { i ->
                       when (i) {
@@ -2918,6 +3267,7 @@ jobs:
                           }
                           5 -> { recents.clear(); sp.put("recents", "[]"); buildGroups(); refresh(); toast("مُسح السجل") }
                           6 -> cycleDepth()
+                          7 -> cycleResize()
                       }
                   }
               }
@@ -3021,6 +3371,8 @@ jobs:
 
               override fun onBackPressed() {
                   when {
+                      // جاي من قسم الأفلام/المسلسلات: الرجوع يرجّع **نفس القسم ونفس العنصر** (لا المسكن)
+                      fromGrid -> { savePosNow(); finish() }
                       full -> toggleFull(false)
                       pipOn -> showPip(false)
                       etSearch.text.isNotEmpty() -> etSearch.setText("")
@@ -3054,6 +3406,8 @@ jobs:
                   tvFullDur = findViewById(R.id.tv_full_dur)
                   fullTitle = findViewById(R.id.full_title)
                   fullQual = findViewById(R.id.full_qual)
+                  // الشريط العلوي للمشغل الكامل (العنوان + الشعار + الجودة) — نُحرّكه مع الشريط السفلي
+                  topBar = try { fullTitle.parent as? View } catch (t: Throwable) { null }
                   tvChanCount = findViewById(R.id.tv_chan_count)
                   tvGroupTitle = findViewById(R.id.tv_group_title)
                   wdBar = findViewById(R.id.wdBar)
@@ -3095,6 +3449,10 @@ jobs:
                   findViewById<View>(R.id.tab_settings).setOnClickListener { settingsDialog() }
 
                   findViewById<Button>(R.id.btn_dock_full).setOnClickListener { toggleFull(true) }
+                  try {
+                      findViewById<Button>(R.id.btn_dock_full).setOnLongClickListener { cycleResize(); true }
+                      findViewById<Button>(R.id.btn_full_close).setOnLongClickListener { cycleResize(); true }
+                  } catch (t: Throwable) {}
                   findViewById<Button>(R.id.btn_dock_fav).setOnClickListener { toggleFav() }
                   findViewById<Button>(R.id.btn_dock_catch).setOnClickListener { catchup() }
                   findViewById<Button>(R.id.btn_prev).setOnClickListener { prev() }
@@ -3103,7 +3461,10 @@ jobs:
                       val p = player ?: return@setOnClickListener
                       if (p.isPlaying) p.pause() else p.play()
                   }
-                  findViewById<Button>(R.id.btn_full_close).setOnClickListener { toggleFull(false) }
+                  findViewById<Button>(R.id.btn_full_close).setOnClickListener {
+                      if (fromGrid) { savePosNow(); finish() }        // «إغلاق» = رجوع للقسم بنفس الموضع
+                      else toggleFull(false)
+                  }
                   findViewById<Button>(R.id.btn_full_play).setOnClickListener {
                       val p = player ?: return@setOnClickListener
                       if (p.isPlaying) p.pause() else p.play()
@@ -4077,6 +4438,13 @@ jobs:
                       return m.groupValues[1] + path
                   }
 
+                  /**
+                   * تصحيح تلقائي لنسبة الصورة: بعض البوابات ترسل أبعاد الفيديو مقلوبة (عمودي 1080×1920)
+                   * والصورة الحقيقية أفقية، فتظهر مشدودة على الهاتف. نرجع "3" (نسبة 16:9 ثابتة) وإلا null.
+                   */
+                  fun autoAspect(w: Int, h: Int, landscape: Boolean): String? =
+                      if (landscape && w > 0 && h > w) "3" else null
+
                   /** أمر محلي قياسي عندما لا ترسل البوابة cmd: http://localhost/ch/<id>_ (نفس ما يبنيه MAG) */
                   fun localCmd(id: String): String {
                       val n = id.substringBefore(":").replace(Regex("\\D"), "")
@@ -4114,7 +4482,8 @@ jobs:
                       m["User-Agent"] = UA_STB
                       m["X-User-Agent"] = "Model: MAG250; Link: WiFi"
                   } else {
-                      m["User-Agent"] = "Mozilla/5.0 (QtEmbedded; Linux; C) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36"
+                      // نفس قيم كود Java المجرَّب حرفيًا
+                      m["User-Agent"] = "Mozilla/5.0 (QtEmbedded; Linux; C)"
                       m["X-User-Agent"] = "Mozilla/5.0 (QtEmbedded; Linux; C)"
                   }
                   m["Referer"] = base + "/c/"
@@ -4373,7 +4742,10 @@ jobs:
                   if (live.isEmpty()) {
                       val cats = if (liveCats.isNotEmpty()) liveCats else liveCategories()
                       for (g in cats) {
-                          val r = req("type=itv&action=get_ordered_list&genre=" + Uri.encode(g.catId) + "&p=1") ?: continue
+                          var r = req("type=itv&action=get_ordered_list&genre=" + Uri.encode(g.catId) + "&p=1")
+                          if (r == null || itemsOf(r).length() == 0)
+                              r = req("type=itv&action=get_ordered_list&category=" + Uri.encode(g.catId) + "&p=1")
+                          if (r == null) continue
                           val arr = itemsOf(r)
                           for (i in 0 until arr.length()) {
                               val o = arr.optJSONObject(i) ?: continue
@@ -4417,12 +4789,21 @@ jobs:
                   return c
               }
 
+              /**
+               * صفحة قسم واحد. بعض البوابات تقبل `genre=` فقط (Stalker) وبعضها `category=` فقط
+               * (كما في كود Java الذي يستعمل get_ordered_list&category=<id>) — نجرب الاثنين.
+               */
               fun page(type: String, genreId: String, page: Int, search: String): String? {
+                  val tail = if (search.isNotBlank()) "&search=" + Uri.encode(search) else ""
                   var q = "type=$type&action=get_ordered_list&p=$page"
                   if (genreId.isNotBlank() && genreId != "0") q += "&genre=" + Uri.encode(genreId)
-                  if (search.isNotBlank()) q += "&search=" + Uri.encode(search)
-                  q += "&detailed=1&sortby=posted"
-                  return req(q)
+                  val r = req(q + tail + "&detailed=1&sortby=posted")
+                  if (r != null && itemsOf(r).length() > 0) return r
+                  if (genreId.isBlank() || genreId == "0") return r
+                  // إعادة المحاولة بصيغة category=
+                  val q2 = "type=$type&action=get_ordered_list&p=$page&category=" + Uri.encode(genreId)
+                  val r2 = req(q2 + tail + "&detailed=1&sortby=posted")
+                  return if (r2 != null && itemsOf(r2).length() > 0) r2 else r
               }
 
               fun fetchAll(kind: String, cats: List<Group>, out: MutableList<Channel>, maxPages: Int, budgetMs: Long, progress: (String) -> Unit): Int {
@@ -4526,89 +4907,358 @@ jobs:
                   return out.size
               }
 
-              fun seriesTree(seriesId: String, genre: String, cover: String, out: MutableList<Channel>): Int {
+              /**
+               * شجرة المسلسل — **نفس كود Java** (`fetchStalkerSeriesTree` + `tryStalkerSeriesUrl` +
+               * `processStalkerSeriesItems`): 3 صيغ للرابط (بـ force_ch_link_check=1)، ومعالجة العناصر:
+               *   • موسم فيه حلقات مدمجة → مجلد موسم + حلقاته في الخازن
+               *   • موسم بلا حلقات → مجلد موسم (الحلقات تُجلب عند الضغط عليه)
+               *   • حلقة مباشرة (فيها cmd) → حلقة
+               */
+              fun seriesTree(seriesId0: String, genre: String, cover: String, out: MutableList<Channel>): Int {
+                  val seriesId = seriesId0.replace("series_", "").trim()
+                  if (seriesId.isBlank()) return 0
                   val enc = Uri.encode(seriesId)
                   val urls = listOf(
-                      "type=series&action=get_series_info&movie_id=$enc",
                       "type=series&action=get_ordered_list&movie_id=$enc&p=1&force_ch_link_check=1",
                       "type=vod&action=get_ordered_list&movie_id=$enc&p=1&force_ch_link_check=1",
-                      "type=series&action=get_ordered_list&series_id=$enc&p=1&force_ch_link_check=1"
+                      "type=series&action=get_ordered_list&series_id=$enc&p=1&force_ch_link_check=1",
+                      "type=series&action=get_series_info&movie_id=$enc"
                   )
                   for (u in urls) {
                       val r = req(u) ?: continue
-                      var added = 0
-                      val js = jsOf(r)
-                      val seasons = if (js is JSONObject) js.optJSONObject("series") else null
-                      if (seasons != null) {
-                          val keys = seasons.keys()
-                          while (keys.hasNext()) {
-                              val k = keys.next()
-                              val sd = seasons.optJSONObject(k) ?: continue
-                              val seasonName = sd.optString("name").ifBlank { "موسم $k" }
-                              val eps = sd.optJSONArray("series") ?: sd.optJSONArray("episodes")
-                              if (eps == null) {
-                                  out.add(Channel().apply {
-                                      kind = "season"; stype = "season"; name = seasonName
-                                      group = if (genre.isBlank()) "مسلسلات" else genre
-                                      id = "season_" + seriesId + "_" + k; mid = seriesId; sid = k
-                                      logo = cover; catId = seriesId
-                                  })
-                                  added++
-                                  continue
-                              }
-                              for (i in 0 until eps.length()) {
-                                  val e = eps.optJSONObject(i) ?: continue
-                                  out.add(episodeChannel(e, seriesId, k, seasonName, genre, cover, out.size))
-                                  added++
-                              }
-                          }
-                      }
-                      if (added == 0) {
-                          val arr = itemsOf(r)
-                          for (i in 0 until arr.length()) {
-                              val o = arr.optJSONObject(i) ?: continue
-                              val nested = o.optJSONArray("series") ?: o.optJSONArray("episodes")
-                              val seasonNum = str(o, "season_number", "season_num", "season_id")
-                              if (nested != null && nested.length() > 0) {
-                                  val sName = str(o, "name", "title").ifBlank { "موسم " + seasonNum.ifBlank { (i + 1).toString() } }
-                                  val sId = str(o, "id", "season_id").ifBlank { seasonNum }
-                                  for (e in 0 until nested.length()) {
-                                      val ep = nested.optJSONObject(e) ?: continue
-                                      out.add(episodeChannel(ep, seriesId, sId, sName, genre, cover, out.size))
-                                      added++
-                                  }
-                              } else if (str(o, "cmd", "media_url").isBlank() &&
-                                  (seasonNum.isNotBlank() || str(o, "name").lowercase().contains("season") || str(o, "name").contains("موسم"))) {
-                                  out.add(Channel().apply {
-                                      kind = "season"; stype = "season"
-                                      name = str(o, "name", "title").ifBlank { "موسم $seasonNum" }
-                                      group = if (genre.isBlank()) "مسلسلات" else genre
-                                      id = "season_" + seriesId + "_" + str(o, "id", "season_id")
-                                      mid = seriesId; sid = str(o, "season_id", "id", "season_number").ifBlank { seasonNum }
-                                      logo = cover; catId = seriesId
-                                  })
-                                  added++
-                              } else if (str(o, "cmd", "media_url").isNotBlank()) {
-                                  val c = toChannel(o, "episode", genre, seriesId, out.size + 1)
-                                  c.mid = seriesId
-                                  c.sid = str(o, "season_id", "season_number").ifBlank { seasonNum }
-                                  if (c.name.isBlank()) c.name = "الحلقة ${i + 1}"
-                                  c.kind = "episode"; c.stype = "episode"
-                                  out.add(c); added++
-                              }
-                          }
-                      }
-                      if (added > 0) return added
+                      val created = processSeriesItems(r, seriesId, genre, cover, out)
+                      if (created > 0) return out.size
                   }
-                  return seasonEpisodes(seriesId, "", out)
+                  return 0
+              }
+
+              /** نفس `processStalkerSeriesItems`: يحوّل عناصر الاستجابة إلى مواسم/حلقات. */
+              private fun processSeriesItems(json: String, seriesId: String, genre: String, cover: String, out: MutableList<Channel>): Int {
+                  var created = 0
+
+                  // (أ) خريطة المواسم: js = { "1": {name, series:[...]} } أو js.series = { ... }
+                  val js = jsOf(json)
+                  val mapObj: JSONObject? = when {
+                      js is JSONObject && js.optJSONObject("series") != null -> js.optJSONObject("series")
+                      js is JSONObject && looksLikeSeasonMap(js) -> js
+                      else -> null
+                  }
+                  if (mapObj != null) {
+                      val keys = ArrayList<String>()
+                      val it = mapObj.keys(); while (it.hasNext()) keys.add(it.next())
+                      keys.sortBy { it.toIntOrNull() ?: 9999 }
+                      for (k in keys) {
+                          val sd = mapObj.optJSONObject(k) ?: continue
+                          val eps = sd.optJSONArray("series") ?: sd.optJSONArray("episodes")
+                          val sName = str(sd, "name", "title").ifBlank { "موسم $k" }
+                          addSeasonFolder(out, seriesId, if (genre.isBlank()) "مسلسلات" else genre, cover, k, sName, k, eps)
+                          created++
+                      }
+                      if (created > 0) { sortTree(out); return created }
+                  }
+
+                  // (ب) مصفوفة عناصر (نفس منطق Java حرفيًا)
+                  val items = itemsOf(json)
+                  for (i in 0 until items.length()) {
+                      val item = items.optJSONObject(i) ?: continue
+                      val id = str(item, "id")
+                      val name = str(item, "name", "title")
+                      val cmd = cleanCmd(str(item, "cmd", "media_url", "url"))
+                      val explicitSeasonId = str(item, "season_id")
+                      val seasonNumber = str(item, "season_number", "season_num")
+                      val episodeNumber = str(item, "episode_number", "series_number")
+                      var nested = item.optJSONArray("series") ?: item.optJSONArray("episodes") ?: item.optJSONArray("seasons")
+                      val isSeasonStr = str(item, "is_season")
+                      val hasEpisodeMarkers = episodeNumber.isNotBlank() || item.has("episode_id") || item.has("series_number") || item.has("episode_number")
+                      val isSeason = !hasEpisodeMarkers && (item.optBoolean("is_season", false) || isSeasonStr == "1" ||
+                          isSeasonStr.equals("true", true) || explicitSeasonId.isNotBlank() || seasonNumber.isNotBlank() ||
+                          nested != null || (cmd.isBlank() && (name.contains("موسم") || name.lowercase().contains("season"))))
+                      val rawKey = when {
+                          explicitSeasonId.isNotBlank() -> explicitSeasonId
+                          seasonNumber.isNotBlank() -> seasonNumber
+                          id.isNotBlank() -> id
+                          else -> name
+                      }
+                      val sName0 = name.ifBlank { "موسم " + seasonNumber.ifBlank { rawKey } }
+                      val sKey = normSeasonKey(rawKey, sName0, seasonNumber)
+                      when {
+                          nested != null && nested.length() > 0 -> {
+                              addSeasonFolder(out, seriesId, if (genre.isBlank()) "مسلسلات" else genre, cover, sKey,
+                                  sName0, seasonNumber, nested)
+                              created++
+                          }
+                          isSeason -> {
+                              addSeasonFolder(out, seriesId, if (genre.isBlank()) "مسلسلات" else genre, cover, sKey,
+                                  sName0, seasonNumber, null)
+                              created++
+                          }
+                          cmd.isNotBlank() -> {
+                              out.add(episodeChannel(item, seriesId, normSeasonKey(if (explicitSeasonId.isNotBlank()) explicitSeasonId else seasonNumber, name, seasonNumber), "", genre, cover, out.size))
+                              created++
+                          }
+                      }
+                  }
+                  sortTree(out)
+                  return created
+              }
+
+              /** هل هذا العنصر بطاقة موسم (لا حلقة)؟ — نفس شروط كود Java. */
+              private fun looksLikeSeason(o: JSONObject): Boolean {
+                  val id = str(o, "id"); val name = str(o, "name", "title")
+                  val cmd = cleanCmd(str(o, "cmd", "media_url", "url"))
+                  val seasonNum = str(o, "season_number", "season_num")
+                  val epNum = str(o, "episode_number", "series_number")
+                  val isSeasonStr = str(o, "is_season")
+                  val hasEpisodeMarkers = epNum.isNotBlank() || o.has("episode_id") || o.has("series_number") || o.has("episode_number")
+                  if (hasEpisodeMarkers) return false
+                  if (o.optBoolean("is_season", false) || isSeasonStr == "1" || isSeasonStr.equals("true", true)) return true
+                  if (str(o, "season_id").isNotBlank() || seasonNum.isNotBlank()) return true
+                  if (cmd.isBlank() && (name.contains("موسم") || name.lowercase().contains("season"))) return true
+                  return false
+              }
+
+              /** يفهم إن كان هذا JSONObject خريطة مواسم (مفاتيح أرقام). */
+              private fun looksLikeSeasonMap(o: JSONObject): Boolean {
+                  val it = o.keys()
+                  var seen = 0
+                  while (it.hasNext()) {
+                      val k = it.next()
+                      if (k.toIntOrNull() != null || k.lowercase().contains("season")) { seen++; if (seen > 0) return true }
+                      if (k == "data" || k == "cmd" || k == "token") return false
+                  }
+                  return false
+              }
+
+              /**
+               * مفتاح موسم موحّد (رقم الموسم). الغاية: لو رجعت نفس المواسم بأشكال مختلفة
+               * (`id=1` و `season_id=1` و «Season 1») تُصبح بطاقة واحدة لا ثلاث بطاقات مكرّرة.
+               */
+              private fun normSeasonKey(raw: String, name: String, seasonNumber: String = ""): String {
+                  val m = Regex("(?i)(?:موسم|season)\\s*0*(\\d{1,4})").find(name)
+                  if (m != null) return m.groupValues[1]
+                  val sn = seasonNumber.trim()
+                  if (sn.toIntOrNull() != null) return sn
+                  var r = raw.trim().replace("series_", "")
+                  if (r.contains(":")) {
+                      val t = r.substringAfterLast(':').trim()
+                      if (t.toIntOrNull() != null) return t
+                  }
+                  if (r.isBlank()) {
+                      val m2 = Regex("(?i)s(\\d{1,3})\\b").find(name)
+                      if (m2 != null) return m2.groupValues[1]
+                  }
+                  return r
+              }
+
+              /** اسم بطاقة الموسم + عدد حلقاته الحقيقي. */
+              private fun seasonTitle(seasonName: String, key: String, cnt: Int): String {
+                  var base = seasonName.trim()
+                  if (base.isEmpty() || base.toIntOrNull() != null) base = "موسم " + key
+                  else if (!base.contains("موسم") && !base.lowercase().contains("season")) base = "موسم " + key
+                  return if (cnt > 0) "$base • $cnt حلقة" else base
+              }
+
+              /** ترتيب الحلقات رقميًا + حذف التكرار (نفس ترتيب حلقات المسلسل في التطبيق). */
+              private fun sortEps(list: List<Channel>): List<Channel> {
+                  val seen = HashSet<String>()
+                  val uniq = ArrayList<Channel>()
+                  for (c in list) {
+                      val k = (if (c.url.isNotBlank()) c.url else c.id).trim() + "|" + c.name.trim()
+                      if (k == "|" || !seen.add(k)) continue
+                      uniq.add(c)
+                  }
+                  return uniq.sortedWith(compareBy({ it.num }, { it.name }))
+              }
+
+              /** ترتيب بطاقات المواسم رقميًا: موسم 2 قبل موسم 10 (لا ترتيب أبجدي). */
+              private fun sortTree(out: MutableList<Channel>) {
+                  if (out.none { it.stype == "season" }) return
+                  val sorted = out.sortedWith(compareBy(
+                      { it.sid.toIntOrNull() ?: 99999 },
+                      { it.name }))
+                  out.clear()
+                  out.addAll(sorted)
+              }
+
+              /** ينشئ بطاقة موسم (ويحفظ حلقاته المدمجة في الخازن) مع دمج المواسم المكرّرة. */
+              private fun addSeasonFolder(out: MutableList<Channel>, seriesId: String, genre: String, cover: String,
+                                          seasonKey: String, seasonName: String, seasonNumber: String, eps: JSONArray?) {
+                  val g = if (genre.isBlank()) "مسلسلات" else genre
+                  val key = normSeasonKey(seasonKey, seasonName, seasonNumber)
+                  val ck = seriesId + "|" + key
+                  if (eps != null && eps.length() > 0) {
+                      val list = ArrayList<Channel>()
+                      for (k in 0 until eps.length()) {
+                          val e = eps.optJSONObject(k) ?: continue
+                          list.add(episodeChannel(e, seriesId, key, seasonName, g, cover, k))
+                      }
+                      if (list.isNotEmpty()) synchronized(seasonCache) {
+                          val merged = ArrayList(seasonCache[ck] ?: emptyList())
+                          merged.addAll(list)
+                          seasonCache[ck] = sortEps(merged)
+                      }
+                  }
+                  val cnt = synchronized(seasonCache) { seasonCache[ck]?.size ?: 0 }
+                  val exist = out.firstOrNull { it.stype == "season" && it.mid == seriesId && it.sid == key }
+                  if (exist != null) {                       // موسم مكرّر: نحدّث الاسم/العدد ولا نضيف بطاقة ثانية
+                      exist.name = seasonTitle(seasonName, key, cnt)
+                      return
+                  }
+                  out.add(Channel().apply {
+                      kind = "season"; stype = "season"
+                      name = seasonTitle(seasonName, key, cnt)
+                      group = g
+                      id = "season_" + seriesId + "_" + key
+                      mid = seriesId; sid = key
+                      logo = cover; catId = seriesId
+                      extra = seasonName.ifBlank { "موسم $key" }
+                  })
+              }
+
+              /** خازن حلقات المواسم المدمجة في الاستجابة (بلا طلب إضافي). */
+              private val seasonCache = HashMap<String, List<Channel>>()
+
+              /**
+               * حلقات موسم — **نفس كود Java** (`fetchStalkerEpisodes`):
+               * 3 صيغ للرابط + مطابقة الموسم `isSameMacPortalSeason` + قراءة `server.series[]`.
+               */
+              fun seasonEpisodes(seriesId0: String, seasonId: String, out: MutableList<Channel>): Int {
+                  val seriesId = seriesId0.replace("series_", "").trim()
+                  if (seriesId.isBlank()) return 0
+                  val key = normSeasonKey(seasonId, "", "")
+                  // (0) حلقات مدمجة محفوظة من الشجرة (بلا شبكة) — نفس `getEpisodesForParent` في كود Java
+                  synchronized(seasonCache) {
+                      val hit = seasonCache[seriesId + "|" + key] ?: seasonCache[seriesId + "|" + seasonId.trim()]
+                      if (hit != null && hit.isNotEmpty()) { out.addAll(hit); return hit.size }
+                  }
+                  val enc = Uri.encode(seriesId)
+                  val urls = ArrayList<String>()
+                  urls.add("type=series&action=get_ordered_list&movie_id=$enc&p=1")
+                  if (!seriesId.contains(":")) urls.add("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$seriesId") + "&p=1")
+                  if (key.isNotBlank()) urls.add("type=series&action=get_ordered_list&movie_id=$enc&season_id=" + Uri.encode(key) + "&p=1")
+                  urls.add("type=series&action=get_series_info&movie_id=$enc")
+                  for (u in urls) {
+                      val r = req(u) ?: continue
+                      val tmp = ArrayList<Channel>()
+                      val n = parseSeasonEpisodes(r, seriesId, key, tmp)
+                      if (n > 0) return finishEps(seriesId, key, tmp, out)
+                  }
+                  // آخر حل: نفس صيغة النجاة (movie_id = series:season)
+                  if (key.isNotBlank()) {
+                      val r = req("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$key") + "&p=1")
+                      if (r != null) {
+                          val tmp = ArrayList<Channel>()
+                          if (parseSeasonEpisodes(r, seriesId, key, tmp) > 0) return finishEps(seriesId, key, tmp, out)
+                      }
+                  }
+                  return 0
+              }
+
+              /** يختم جلب الحلقات: ترتيب رقمي + حذف التكرار + خزن (نفس `finishEpisodesLoad`). */
+              private fun finishEps(seriesId: String, key: String, tmp: List<Channel>, out: MutableList<Channel>): Int {
+                  val list = sortEps(tmp)
+                  synchronized(seasonCache) { if (list.isNotEmpty()) seasonCache[seriesId + "|" + key] = list }
+                  out.addAll(list)
+                  return list.size
+              }
+
+              /** يقرأ حلقات الموسم من الاستجابة (نفس حلقة Java داخل `fetchStalkerEpisodesRequest`). */
+              private fun parseSeasonEpisodes(json: String, seriesId: String, seasonId: String, out: MutableList<Channel>): Int {
+                  // خريطة مواسم: js = {"1": {series:[...]}}
+                  val js = jsOf(json)
+                  val mapObj: JSONObject? = when {
+                      js is JSONObject && js.optJSONObject("series") != null -> js.optJSONObject("series")
+                      js is JSONObject && looksLikeSeasonMap(js) -> js
+                      else -> null
+                  }
+                  if (mapObj != null) {
+                      val keys = ArrayList<String>()
+                      val it = mapObj.keys(); while (it.hasNext()) keys.add(it.next())
+                      for (k in keys) {
+                          if (!isSameSeason(seasonId, k, k, k)) continue
+                          val sd = mapObj.optJSONObject(k) ?: continue
+                          val eps = sd.optJSONArray("series") ?: sd.optJSONArray("episodes") ?: continue
+                          val sName = str(sd, "name", "title").ifBlank { "موسم $k" }
+                          for (i in 0 until eps.length()) {
+                              val e = eps.optJSONObject(i) ?: continue
+                              val c = episodeChannel(e, seriesId, if (isSameSeason(seasonId, k, k, k)) k else seasonId, sName, "", "", out.size)
+                              if (out.none { it.id == c.id }) out.add(c)
+                          }
+                      }
+                      if (out.isNotEmpty()) return out.size
+                  }
+
+                  val arr = itemsOf(json)
+                  var added = 0
+                  for (i in 0 until arr.length()) {
+                      val season = arr.optJSONObject(i) ?: continue
+                      val returnedId = str(season, "id").trim()
+                      val returnedSeasonId = str(season, "season_id").trim()
+                      val returnedSeasonNumber = str(season, "season_number").trim()
+                      val nested = season.optJSONArray("series") ?: season.optJSONArray("episodes")
+                      val same = isSameSeason(seasonId, returnedId, returnedSeasonId, returnedSeasonNumber)
+                      if (!same) continue
+                      if (nested == null || nested.length() == 0) continue
+                      val sId = if (returnedId.isNotBlank()) returnedId else seasonId
+                      val sName = str(season, "name", "title").ifBlank { "موسم " + returnedSeasonNumber.ifBlank { sId } }
+                      for (e in 0 until nested.length()) {
+                          val ep = nested.optJSONObject(e) ?: continue
+                          val c = episodeChannel(ep, seriesId, sId, sName, "", "", out.size)
+                          if (out.none { it.id == c.id }) { out.add(c); added++ }
+                      }
+                  }
+                  // لو ما كانش تصنيف مواسم في الرد: العناصر نفسها حلقات (بوابات مسطّحة)
+                  if (added == 0 && arr.length() > 0) {
+                      var flat = 0
+                      for (i in 0 until arr.length()) {
+                          val o = arr.optJSONObject(i) ?: continue
+                          if (o.optJSONArray("series") != null || o.optJSONArray("episodes") != null) continue
+                          if (looksLikeSeason(o)) continue          // بطاقة موسم ≠ حلقة
+                          val cmd = cleanCmd(str(o, "cmd", "media_url", "url"))
+                          val id = str(o, "id")
+                          if (cmd.isBlank() && id.isBlank()) continue
+                          val c = episodeChannel(o, seriesId, seasonId, "", "", "", out.size)
+                          if (out.none { it.id == c.id }) { out.add(c); flat++ }
+                      }
+                      added += flat
+                  }
+                  return added
+              }
+
+              /** مطابقة الموسم المطلوب مع ما رجعه السرفر — نفس `isSameMacPortalSeason` بالحرف. */
+              fun isSameSeason(wantedSeasonId: String, returnedId: String, returnedSeasonId: String, returnedSeasonNumber: String): Boolean {
+                  if (wantedSeasonId.trim().isEmpty()) return true
+                  val wanted = wantedSeasonId.trim()
+                  if (wanted == returnedId) return true
+                  if (wanted == returnedSeasonId) return true
+                  if (wanted == returnedSeasonNumber) return true
+                  if (wanted.contains(":")) {
+                      val wNum = wanted.substring(wanted.lastIndexOf(":") + 1)
+                      if (wNum == returnedSeasonNumber) return true
+                      if (returnedId.endsWith(":$wNum")) return true
+                      if (returnedSeasonId.endsWith(":$wNum")) return true
+                  }
+                  if (returnedId.contains(":")) {
+                      val rNum = returnedId.substring(returnedId.lastIndexOf(":") + 1)
+                      if (wanted == rNum) return true
+                  }
+                  if (returnedSeasonId.contains(":")) {
+                      val rNum = returnedSeasonId.substring(returnedSeasonId.lastIndexOf(":") + 1)
+                      if (wanted == rNum) return true
+                  }
+                  return false
               }
 
               private fun episodeChannel(e: JSONObject, seriesId: String, seasonId: String, seasonName: String, genre: String, cover: String, i: Int): Channel {
                   val c = Channel()
                   c.kind = "episode"
                   c.stype = "episode"
-                  c.num = i + 1
-                  c.name = str(e, "name", "title", "episode_name").ifBlank { "الحلقة ${i + 1}" }
+                  val rawName = str(e, "name", "title", "episode_name")
+                  var n = str(e, "episode_number", "series_number", "series", "num", "episode")
+                      .filter { it.isDigit() }.take(4).toIntOrNull()
+                  if (n == null) n = Regex("(\\d{1,4})").find(rawName)?.groupValues?.get(1)?.toIntOrNull()
+                  c.num = n ?: (i + 1)
+                  c.name = rawName.ifBlank { "الحلقة ${c.num}" }
                   c.group = if (seasonName.isNotBlank()) seasonName else (if (genre.isNotBlank()) genre else "مسلسلات")
                   c.id = str(e, "id", "episode_id", "series_id")
                   c.url = cleanCmd(str(e, "cmd", "media_url", "url", "link"))
@@ -4620,35 +5270,6 @@ jobs:
                   return c
               }
 
-              fun seasonEpisodes(seriesId: String, seasonId: String, out: MutableList<Channel>): Int {
-                  val enc = Uri.encode(seriesId)
-                  val urls = ArrayList<String>()
-                  if (seasonId.isNotBlank()) urls.add("type=series&action=get_ordered_list&movie_id=$enc&season_id=" + Uri.encode(seasonId) + "&p=1&detailed=1")
-                  urls.add("type=series&action=get_ordered_list&movie_id=" + Uri.encode("$seriesId:$seriesId") + "&p=1&detailed=1")
-                  urls.add("type=vod&action=get_ordered_list&genre=" + enc + "&p=1&detailed=1&series_id=" + enc)
-                  for (u in urls) {
-                      val r = req(u) ?: continue
-                      val arr = itemsOf(r)
-                      if (arr.length() == 0) continue
-                      var n = 0
-                      for (i in 0 until arr.length()) {
-                          val o = arr.optJSONObject(i) ?: continue
-                          val eps = o.optJSONArray("series") ?: o.optJSONArray("episodes")
-                          if (eps != null && eps.length() > 0) {
-                              val sName = str(o, "name", "title").ifBlank { "موسم $seasonId" }
-                              val sId = str(o, "id", "season_id").ifBlank { seasonId }
-                              for (k in 0 until eps.length()) {
-                                  val e = eps.optJSONObject(k) ?: continue
-                                  out.add(episodeChannel(e, seriesId, sId, sName, "", "", out.size)); n++
-                              }
-                          } else {
-                              out.add(episodeChannel(o, seriesId, str(o, "season_id").ifBlank { seasonId }, "موسم $seasonId", "", "", out.size)); n++
-                          }
-                      }
-                      if (n > 0) return n
-                  }
-                  return 0
-              }
 
               // ----------------------------- التشغيل -----------------------------
 
@@ -6458,7 +7079,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.10 (code 810)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.16 (code 816)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
