@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.32"
-      VERSION_CODE: "832"
+      VERSION_NAME: "8.33"
+      VERSION_CODE: "833"
     steps:
     - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                minSdk 21
                targetSdk 34
                // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 832)
-               versionName (System.getenv("VERSION_NAME") ?: "8.32")
+               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 833)
+               versionName (System.getenv("VERSION_NAME") ?: "8.33")
                vectorDrawables.useSupportLibrary = true
            }
 
@@ -189,6 +189,7 @@ jobs:
             implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
             implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
             implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
+            implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
            implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
            implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
            implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
@@ -218,21 +219,23 @@ jobs:
        cat <<'NP_EOF' > README.md
        # NovaPlay — مشغّل IPTV (Kotlin · `com.nova.play`)
 
-       **الإصدار 8.32 (code 832)** — بلا تقطيع + ريموت وفوكس مضبوطين + مشغل نظيف.
+       **الإصدار 8.33 (code 833)** — إصلاح خطأ التصريف اللي وقف البناء + نفس إصلاحات 8.32 كاملة.
 
        ## البناء
        ارفع الملف (**Add file → Upload files**) ⇒ Commit ⇒ Actions ⇒ Artifacts ⇒ `app-debug.apk`.
-       بعد التثبيت: **الإعدادات لازم 8.32**.
+       بعد التثبيت: **الإعدادات لازم 8.33**.
 
-       ## واش تصلّح في 8.32
-       - **التقطيع:** المخزون نتاع المباشر كان صغيرًا جدًا (1.2 ثانية) ⇒ كبّرناه، وهدف البث باعدناه عن الحرف.
-       - **عجلة «جاري تحميل»** ما بقاتش تظهر على كل وقفة خفيفة (كانت تُحسّ كتقطيع).
-       - **الوقفة:** أولًا إصلاح ناعم بلا قطع الصورة، وبعدها فقط إعادة تشغيل كاملة.
-       - **الريموت:** الفوكس ما بقاش يذهب لصندوق البحث لحاله.
-       - **الرجوع من القناة:** يرجع للقسم اللي فيه القناة + الفوكس على القناة.
-       - **الرجوع من فلم/حلقة:** دائمًا لقائمة الأفلام/المسلسلات بنفس القسم ونفس العنصر (قبل: كان يرجع لقائمة المسلسلات).
-       - **المشغل:** 5 أزرار احترافية فقط + زر «⋯» فيه الباقي · وفي مشغل القنوات ما تبقاش أزرار عائمة على الصورة.
-       - **الريموت في المشغل:** والشريط مخفي: فوق/تحت = قناة، يمين/يسار = 10 ثوانٍ.
+       ## واش كان سبب فشل البناء في 8.32
+       متغيّر `busyFlash` (مؤقّت ظهور عجلة التحميل) كان يقبل «بلا قيمة» (null) وتمرّره لدالة الـHandler،
+       وandroid-34 يرفض ذلك في التصريف. صُلّح بتمرير قيمة صحيحة دائمًا.
+
+       ## واش في 8.33 (مثل 8.32)
+       - **بلا تقطيع:** مخزون أكبر للمباشر (6 ثوانٍ) + هامش أوسع عن حرف البثّ + عجلة التحميل ما تظهرش على وقفة خفيفة + إصلاح ناعم قبل إعادة التشغيل.
+       - **الريموت:** الفوكس ما يروحش لصندوق البحث لحاله.
+       - **الرجوع من قناة:** يرجع للقسم اللي فيه القناة + الفوكس على القناة.
+       - **الرجوع من فلم/حلقة:** دائمًا لقائمة الأفلام/المسلسلات بنفس القسم ونفس العنصر.
+       - **المشغل:** 5 أزرار احترافية + زر «⋯» للباقي · بلا أزرار عائمة في مشغل القنوات.
+       - **ريموت المشغل:** والشريط مخفي: فوق/تحت = قناة · يمين/يسار = 10 ثوانٍ.
 
        ## سجل الأعطال
        `PLAY-URL` الرابط · `PLAY-FAIL` رمز الخطأ · `PLAY-FIX` إصلاح ذاتي · `LIVE-STALL` إصلاح الوقفة.
@@ -3603,17 +3606,18 @@ jobs:
            when (state) {
              Player.STATE_BUFFERING -> {
                // (8.32) ما نُظهرش العجلة على كل توقّف خفيف (ظهورها واختفاؤها المتكرر كان يُحسّ كتقطيع)
-               h.removeCallbacks(busyFlash)
-               busyFlash = Runnable {
+               busyFlash?.let { h.removeCallbacks(it) }
+               val bf = Runnable {
                  try {
                    if (full) { fullBusy.visibility = View.VISIBLE; findViewById<TextView>(R.id.tv_full_txt).text = "جاري تحميل" }
                    else { dockBusy.visibility = View.VISIBLE; tvLoadTxt.text = "جاري تحميل" }
                  } catch (t: Throwable) {}
                }
-               h.postDelayed(busyFlash, 900)
+               busyFlash = bf
+               h.postDelayed(bf, 900)
              }
              Player.STATE_READY -> {
-               h.removeCallbacks(busyFlash); busyFlash = null
+               busyFlash?.let { h.removeCallbacks(it) }; busyFlash = null
                dockBusy.visibility = View.GONE
                fullBusy.visibility = View.GONE
                playStarted = true
@@ -3640,7 +3644,7 @@ jobs:
                } else resumeAsk = 0L
              }
              Player.STATE_ENDED -> {
-               h.removeCallbacks(busyFlash); busyFlash = null
+               busyFlash?.let { h.removeCallbacks(it) }; busyFlash = null
                clearPosOf(cur)
                dockBusy.visibility = View.GONE; fullBusy.visibility = View.GONE
                if (autoNext) next(true) else toast("انتهى العرض")
@@ -8554,7 +8558,7 @@ jobs:
         echo "" >> "$GITHUB_STEP_SUMMARY"
         echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
         echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-        echo "- الحزمة: com.nova.play — الاصدار 8.32 (code 832)" >> "$GITHUB_STEP_SUMMARY"
+        echo "- الحزمة: com.nova.play — الاصدار 8.33 (code 833)" >> "$GITHUB_STEP_SUMMARY"
         echo "- اللغات: Kotlin 1.9.22 + media3 1.4.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Upload artifacts
