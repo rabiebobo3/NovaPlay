@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.34"
-      VERSION_CODE: "834"
+      VERSION_NAME: "8.35"
+      VERSION_CODE: "835"
     steps:
     - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                minSdk 21
                targetSdk 34
                // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 834)
-               versionName (System.getenv("VERSION_NAME") ?: "8.34")
+               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 835)
+               versionName (System.getenv("VERSION_NAME") ?: "8.35")
                vectorDrawables.useSupportLibrary = true
            }
 
@@ -213,23 +213,21 @@ jobs:
        cat <<'NP_EOF' > README.md
        # NovaPlay — مشغّل IPTV (Kotlin · `com.nova.play`)
 
-       **الإصدار 8.34 (code 834)** — الأفلام والحلقات تشتغل + رجوع للقنوات صحيح + لوحة أزرار احترافية.
+       **الإصدار 8.35 (code 835)** — القنوات بلا أزرار + أزرار الأفلام والحلقات في وسط الأسفل.
 
        ## البناء
-       ارفع الملف (**Add file → Upload files**) ⇒ Commit ⇒ Actions ⇒ Artifacts ⇒ `app-debug.apk`.
-       بعد التثبيت: **الإعدادات لازم 8.34**.
+       (**Add file → Upload files**) ثم Commit ⇒ Actions ⇒ Artifacts ⇒ `app-debug.apk`. بعد التثبيت: **الإعدادات لازم 8.35**.
 
-       ## واش تصلّح (أسباب مُثبتة من سجل الأعطال + تجربة على البوابة)
-       - **الأفلام/الحلقات ما كانوش يشتغلوا:** كنا نبعث للبوابة أوامر غالطة (أمر فارغ، معرّف مستخرج من base64،
-         رابط البوابة نفسها، نوع itv لفلم) ⇒ البوابة ترد **رابطًا ميتًا** `stream=.` ⇒ 444/405/404.
-         صار: فلم = `type=vod` وأمر البوابة، وإن ما كانش الأمر نبنيوه من المعرّف (مُجرّب: يرجع رابطًا سليمًا)؛
-         حلقة = صيغة Java بالحرف (base64 + `series=<رقم الحلقة>`)، وكل رابط ميت يُرفض قبل التشغيل.
-       - **«يذهب للحلقة ولا يدخل القنوات»:** كان يُحفظ «آخر عنصر» حتى للأفلام/الحلقات. صار الحفظ للقنوات فقط،
-         وزر «البث المباشر» يفتح وضع القنوات صراحةً.
-       - **الفوكس مع الريموت:** الفوكس يُوضع على القناة/القائمة عند الفتح وبعد اختيار قسم، وما يروحش للبحث أبدًا.
-       - **شكل الأزرار في المشغل الكبير:** لوحة دائرية أنيقة (Vector) — السابق، -10، **تشغيل/إيقاف في الوسط**،
-         +10، التالي، و«⋯» للباقي — وكل زر يتوهّج بحدّ ذهبي لمّا يوصل إليه الريموت.
-       - **بلا أسهم عائمة** على الصورة في مشغل القنوات.
+       ## الجديد في 8.35
+       - **بلا أزرار في القنوات:** شاشة القناة نظيفة — سهم الرجوع، اسم القناة، شعارها، شارة LIVE، و3 أيقونات صغيرة
+         (الجودة · المفضلة · نسبة الصورة). وكل شيء من الريموت: **OK** = تشغيل/إيقاف · **▲▼** = تبديل القناة ·
+         **MENU** = خيارات المشغّل.
+       - **الأفلام والحلقات:** لوحة الأزرار في **وسط الأسفل** وبحجمها الطبيعي (كانت ممتدّة على كامل العرض والأزرار على اليسار):
+         ⏮ · ⏪10 · **⏯ في الوسط** · ⏩10 · ⏭ · ⋯ — وكل زر يتوهّج بحدّ ذهبي عند وصول فوكس الريموت.
+       - **زر التشغيل الوسطي** كان إيموجي (مربّع برتقالي) ⇒ صار أيقونة داخل دائرة بحدّ ذهبي، متناسقة مع اللوحة.
+       - **فوكس ثابت:** عند اختفاء الشرائط يُفرَّغ الفوكس ⇒ ضغطة OK تنفّذ المقصود (تشغيل/إيقاف)، والفوكس يروح للمكان
+         الصحيح عند الفتح (الأفلام: زر التشغيل · القنوات: أيقونة الجودة).
+       - (8.34 محفوظ) الأفلام/الحلقات تشتغل، والرجوع للقنوات صحيح.
 
        ## سجل الأعطال
        `PLAY-URL` الرابط · `PLAY-FAIL` رمز الخطأ · `PLAY-FIX` إصلاح ذاتي · `LIVE-STALL` إصلاح الوقفة.
@@ -3103,8 +3101,9 @@ jobs:
              try { pvFull.requestLayout() } catch (t: Throwable) {}
              pvFull.useController = false
              fullTitle.text = cur?.name ?: ""
-             // (8.34) الفوكس على زر التشغيل مباشرة (أوضح للريموت)
-             findViewById<View>(R.id.btn_full_play)?.requestFocus()
+             // (8.34/8.35) الفوكس: في الأفلام والحلقات على زر التشغيل، وفي القنوات على أيقونة ظاهرة
+             if (isLive) findViewById<View>(R.id.btn_layers)?.requestFocus()
+             else findViewById<View>(R.id.btn_full_play)?.requestFocus()
              hideBarsSoon()
            } else {
              fullBox.visibility = View.GONE
@@ -3112,7 +3111,7 @@ jobs:
              try { pv.player = p } catch (t: Throwable) { Crash.log(t) }
              try { pvFull.player = null } catch (t: Throwable) { Crash.log(t) }
              ctrlLocked = false
-             try { findViewById<TextView>(R.id.btn_center_play)?.visibility = View.GONE } catch (t: Throwable) {}
+             try { findViewById<View>(R.id.btn_center_play)?.visibility = View.GONE } catch (t: Throwable) {}
              // v8.24 + (8.32): نرجّعوا **القسم** اللي فيه القناة ثم نضعوا الفوكس فوق القناة نفسها
              try { cur?.let { c -> selectGroupOf(c) } } catch (t: Throwable) { Crash.log(t) }
              try { focusChannel() } catch (t: Throwable) { Crash.log(t) }
@@ -3194,7 +3193,10 @@ jobs:
 
          private fun updateCenterPlay() {
            try {
-             findViewById<TextView>(R.id.btn_center_play).text = if (player?.isPlaying == true) "⏸" else "▶"
+             (findViewById<View>(R.id.btn_center_play) as? android.widget.ImageView)?.let { v ->
+               v.setImageResource(if (player?.isPlaying == true) R.drawable.ic_pause else R.drawable.ic_play)
+               if (!ctrlLocked) v.alpha = 0.9f
+             }
              // (8.34) أيقونة زر التشغيل في لوحة الأزرار (ImageButton) — تتبدّل مع حالة المشغّل
              (findViewById<View>(R.id.btn_full_play) as? android.widget.ImageButton)?.let { b ->
                b.setImageResource(if (player?.isPlaying == true) R.drawable.ic_pause else R.drawable.ic_play)
@@ -3234,9 +3236,11 @@ jobs:
          private fun toggleLock() {
            ctrlLocked = !ctrlLocked
            try {
-             val cp = findViewById<TextView>(R.id.btn_center_play)
-             cp.text = if (ctrlLocked) "\uD83D\uDD13" else (if (player?.isPlaying == true) "\u23F8" else "\u25B6")
-             cp.visibility = if (full) View.VISIBLE else View.GONE
+             val cp = findViewById<View>(R.id.btn_center_play)
+             (cp as? android.widget.ImageView)?.setImageResource(
+               if (player?.isPlaying == true) R.drawable.ic_pause else R.drawable.ic_play)
+             cp.alpha = if (ctrlLocked) 0.45f else 0.9f
+             cp.visibility = if (full && !isLive) View.VISIBLE else View.GONE
              if (ctrlLocked) fadeBars(false) else showBars()
            } catch (t: Throwable) { Crash.log(t) }
            toast(if (ctrlLocked) "الأزرار مقفلة — اضغط مطوّلًا على 🔓 لفكّها" else "الأزرار مفتوحة")
@@ -3298,10 +3302,10 @@ jobs:
              // (8.34) بلا أسهم عائمة على الصورة: التنقّل صار من لوحة الأزرار السفلية
              vis(R.id.liveBadge, live)
              vis(R.id.fullSeekRow, !live)
-             vis(R.id.fullBtnRow, true)
+             vis(R.id.fullBtnRow, !live)          // (8.35) بلا أزرار في القنوات — للأفلام والحلقات فقط
              vis(R.id.btn_full_back10, !live)
              vis(R.id.btn_full_fwd10, !live)
-             vis(R.id.btn_full_more, true)
+             vis(R.id.btn_full_more, !live)
              vis(R.id.btn_center_play, false)
              vis(R.id.ch_name, true)
              vis(R.id.ch_logo, true)
@@ -3553,6 +3557,8 @@ jobs:
                }
              } catch (t: Throwable) {}
            }
+           // (8.35) بلا فوكس على أزرار مخفيّة: OK = تشغيل/إيقاف، ▲▼ = تبديل، ◀▶ = ±10 ثوان
+           if (!show) { try { currentFocus?.clearFocus() } catch (t: Throwable) {} }
          }
 
          private val hideBar = Runnable {
@@ -3705,7 +3711,7 @@ jobs:
 
          override fun onIsPlayingChanged(isPlaying: Boolean) {
            updateCenterPlay()
-           try { findViewById<TextView>(R.id.btn_center_play).visibility = if (full && !isLive) View.VISIBLE else View.GONE } catch (t: Throwable) {}
+           try { findViewById<View>(R.id.btn_center_play).visibility = if (full && !isLive) View.VISIBLE else View.GONE } catch (t: Throwable) {}
            if (isPlaying) {
              dockBusy.visibility = View.GONE; fullBusy.visibility = View.GONE
              wdBar.visibility = View.GONE
@@ -4282,7 +4288,7 @@ jobs:
                  return true
                }
              }
-             KeyEvent.KEYCODE_MENU -> { settingsDialog(); return true }
+             KeyEvent.KEYCODE_MENU -> { if (full && isLive) moreDialog() else settingsDialog(); return true }
              KeyEvent.KEYCODE_SETTINGS -> { settingsDialog(); return true }
              KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK -> {
                val p = player ?: return false
@@ -4505,7 +4511,7 @@ jobs:
            }
            // v8.24: أزرار المشغّل الاحترافية (تقديم/تأخير ±10، سرعة، ترجمة، صوت، قفل، تشغيل مركزي)
            try {
-             val cplay = findViewById<TextView>(R.id.btn_center_play)
+             val cplay = findViewById<android.widget.ImageView>(R.id.btn_center_play)
              cplay.setOnClickListener {
                if (ctrlLocked) toast("الأزرار مقفلة — ضغطة مطوّلة على القفل لفكّها") else { togglePlay(); showBars() }
              }
@@ -8151,11 +8157,12 @@ jobs:
                        android:visibility="gone" android:text="٪0" android:textColor="@color/np_gold" android:textSize="14sp"/>
                </LinearLayout>
 
-               <!-- زر التشغيل/الإيقاف الكبير (الأفلام والحلقات) -->
-               <TextView android:id="@+id/btn_center_play" android:layout_width="88dp" android:layout_height="88dp"
-                   android:layout_gravity="center" android:gravity="center" android:text="⏸" android:textSize="36sp"
-                   android:textColor="#FFFFFF" android:background="@drawable/circle_gold"
-                   android:alpha="0.85" android:focusable="true" android:clickable="true" android:visibility="gone"/>
+               <!-- (8.35) زر التشغيل/الإيقاف الوسطي: أيقونة متّجهة (لا إيموجي) — الأفلام والحلقات فقط -->
+               <ImageView android:id="@+id/btn_center_play" android:layout_width="80dp" android:layout_height="80dp"
+                   android:layout_gravity="center" android:padding="24dp" android:src="@drawable/ic_pause"
+                   android:background="@drawable/btn_ctrl_main" android:alpha="0.9"
+                   android:contentDescription="تشغيل أو إيقاف"
+                   android:focusable="true" android:clickable="true" android:visibility="gone"/>
 
                <!-- السابق / التالي الكبيران (القنوات: تبديل القناة) -->
                    android:padding="8dp" android:src="@drawable/ic_prev_big" android:alpha="0.85"
@@ -8195,11 +8202,12 @@ jobs:
                        <TextView android:id="@+id/tv_full_dur" android:layout_width="52dp" android:layout_height="wrap_content" android:textColor="@color/np_text" android:textSize="12sp" android:gravity="end" android:text="0:00"/>
                    </LinearLayout>
                    <!-- صف الأزرار الاحترافية (الأفلام والحلقات فقط) -->
-                   <!-- (8.34) لوحة الأزرار الاحترافية: أيقونات دائرية + فوكس ذهبي للريموت -->
-                   <LinearLayout android:id="@+id/fullBtnRow" android:layout_width="match_parent" android:layout_height="wrap_content"
-                       android:layoutDirection="ltr" android:orientation="horizontal" android:gravity="center_vertical"
-                       android:layout_marginTop="10dp" android:background="@drawable/ctrl_panel"
-                       android:paddingStart="8dp" android:paddingEnd="8dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+                   <!-- (8.35) لوحة الأزرار: بحجم المحتوى وفي وسط الأسفل — للأفلام والحلقات فقط (تُخفى في القنوات) -->
+                   <LinearLayout android:id="@+id/fullBtnRow" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                       android:layout_gravity="center_horizontal" android:layoutDirection="ltr"
+                       android:orientation="horizontal" android:gravity="center_vertical"
+                       android:layout_marginTop="6dp" android:background="@drawable/ctrl_panel"
+                       android:paddingStart="6dp" android:paddingEnd="6dp" android:paddingTop="6dp" android:paddingBottom="6dp">
                        <ImageButton android:id="@+id/btn_full_prev" style="@style/CtrlBtn"
                            android:src="@drawable/ic_prev_big" android:contentDescription="السابق"/>
                        <FrameLayout android:id="@+id/btn_full_back10" style="@style/CtrlBtnBox">
@@ -8703,10 +8711,10 @@ jobs:
            </style>
            <!-- (8.34) أنماط لوحة أزرار المشغل الكبير: أزرار دائرية بحدّ ذهبي عند الفوكس (ريموت) -->
            <style name="CtrlBtn">
-               <item name="android:layout_width">50dp</item>
-               <item name="android:layout_height">50dp</item>
-               <item name="android:layout_marginStart">7dp</item>
-               <item name="android:layout_marginEnd">7dp</item>
+               <item name="android:layout_width">48dp</item>
+               <item name="android:layout_height">48dp</item>
+               <item name="android:layout_marginStart">5dp</item>
+               <item name="android:layout_marginEnd">5dp</item>
                <item name="android:padding">12dp</item>
                <item name="android:scaleType">fitCenter</item>
                <item name="android:background">@drawable/btn_ctrl</item>
@@ -8714,19 +8722,19 @@ jobs:
                <item name="android:clickable">true</item>
            </style>
            <style name="CtrlBtnBox">
-               <item name="android:layout_width">50dp</item>
-               <item name="android:layout_height">50dp</item>
-               <item name="android:layout_marginStart">7dp</item>
-               <item name="android:layout_marginEnd">7dp</item>
+               <item name="android:layout_width">48dp</item>
+               <item name="android:layout_height">48dp</item>
+               <item name="android:layout_marginStart">5dp</item>
+               <item name="android:layout_marginEnd">5dp</item>
                <item name="android:background">@drawable/btn_ctrl</item>
                <item name="android:focusable">true</item>
                <item name="android:clickable">true</item>
            </style>
            <style name="CtrlBtnMain">
-               <item name="android:layout_width">62dp</item>
-               <item name="android:layout_height">62dp</item>
-               <item name="android:layout_marginStart">10dp</item>
-               <item name="android:layout_marginEnd">10dp</item>
+               <item name="android:layout_width">56dp</item>
+               <item name="android:layout_height">56dp</item>
+               <item name="android:layout_marginStart">8dp</item>
+               <item name="android:layout_marginEnd">8dp</item>
                <item name="android:padding">16dp</item>
                <item name="android:scaleType">fitCenter</item>
                <item name="android:background">@drawable/btn_ctrl_main</item>
@@ -8775,7 +8783,7 @@ jobs:
         echo "" >> "$GITHUB_STEP_SUMMARY"
         echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
         echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-        echo "- الحزمة: com.nova.play — الاصدار 8.34 (code 834)" >> "$GITHUB_STEP_SUMMARY"
+        echo "- الحزمة: com.nova.play — الاصدار 8.35 (code 835)" >> "$GITHUB_STEP_SUMMARY"
         echo "- اللغات: Kotlin 1.9.22 + media3 1.4.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Upload artifacts
