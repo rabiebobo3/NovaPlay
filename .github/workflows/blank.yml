@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.22"
-      VERSION_CODE: "822"
+      VERSION_NAME: "8.23"
+      VERSION_CODE: "823"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 822)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.22")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 823)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.23")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -385,6 +385,16 @@ jobs:
           | **الفوكس** | كان مقيّدًا بـ«جهاز TV» فالريموت ما يخدمش | الفوكس/الإبراز يخدم على كل الأجهزة: العنصر المُفوكَس يتكبّر قليلًا واسمه يصير ذهبيًا؛ البحث ما يستقبلش فوكس الريموت لكن يبقى يخدم باللمس |
           | **الدليل** | — | بعد كل رجوع تظهر رسالة قصيرة: «رجعت للمكان: …» أو «المواسم (3)» أو «رجعنا للقسم: مسلسلات» + سطر `[RET]`/`[BACK]` في سجل الأعطال |
           | **الفحص** | — | تصريف كامل 0 خطأ / 95 صنف + تصريف الكود المستخرج من ملف yml النهائي |
+
+          ## 8.23 — إصلاح القنوات (غلطة 8.21) + رجوع قاطع
+
+          | النقطة | التفصيل |
+          |---|---|
+          | **القنوات ما كانتش تخدم** | غلطتي: في 8.21 بنيت منظومة «أوامر التشغيل» ونسيت **الخطوة الأخيرة** اللي كانت في 8.20 — تشغيل أمر القناة كما هو بعد تصحيح المضيف (localhost ⇒ مضيف البوابة). حُذفت الثلاثاء القنوات توقّفت. **رجعت في 8.23** كمرشّح أخير، مع إعادة المحاولة بالأمر الداخلي (`cmd` جديد) مثل 8.20 |
+          | **مؤقّت البدء** | صار لا يُلغي القناة الحية أبدًا: للقنوات 25 ثانية، وإن كان المشغّل يجمّع البيانات ينتظر 15 ثانية أخرى؛ ولو ما كانش بديل لا يعلن فشلًا |
+          | **لا أوامر قديمة** | تُنظّف أوامر التشغيل قبل كل عنصر (كانت ممكن تُشغّل قناة غلط) |
+          | **الرجوع** | صار **قاطعًا**: المشغل يرسل `restore=1` مع الإنتنت، والشاشة تستعيد فورًا في `onNewIntent` (إذا كانت موجودة) أو عند الإنشاء — بلا أي حالة داخلية |
+          | **الفحص** | تصريف كامل 0 خطأ / 96 صنف • اختبارات **61 ناجح / 0 فاشل** (منها: بوابة ترفض create_link ⇒ القناة تُشغّل بالرابط المباشر) |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -1864,6 +1874,8 @@ jobs:
                       } else finish()
                   } else build()
                   focusGrid()
+                  // v8.23: الشاشة أُنشئت من جديد بأمر «استعادة» (المشغل كان مفتوحًا) ⇒ نستعيد فورًا
+                  if (intent?.getStringExtra("restore") == "1") tryRestore()
               }
 
               private fun lastProfile(): Profile? = try {
@@ -2373,34 +2385,50 @@ jobs:
               override fun onResume() {
                   super.onResume()
                   goImmersive()
-                  if (sp.s("ret_pending") == "1") {        // رجعنا من المشغل: نفس القسم ونفس العنصر
-                      // v8.22: بلا شرط «pendingScroll» — تُستعاد الحالة من الذاكرة حتى بعد إعادة إنشاء الشاشة/التطبيق
+                  val wantRestore = sp.s("ret_pending") == "1" || intent?.getStringExtra("restore") == "1"
+                  if (wantRestore) {                        // رجعنا من المشغل: نفس القسم ونفس العنصر
                       pendingScroll = false
-                      try {
-                          Crash.note("RET", "kind=" + sp.s("ret_kind") + " lvl=" + sp.s("ret_lvl") +
-                              " eps=" + sp.s("ret_eps").length + " seasons=" + sp.s("ret_seasons").length +
-                              " saved=" + sp.s("ret_saved").length + " played=" + sp.s("ret_played_name"))
-                          restoreReturn()
-                          focusGrid()
-                          val i = items.indexOfFirst {
-                              (lastPlayedUrl.isNotBlank() && it.url == lastPlayedUrl) ||
-                              (lastPlayedId.isNotBlank() && it.id == lastPlayedId && it.name == lastName)
-                          }
-                          if (i >= 0) { rvGrid.scrollToPosition(i); focusOn(i) }
-                          sp.put("ret_pending", "0")           // تُمسح فقط بعد نجاح الاستعادة
-                          val lv = sp.s("ret_lvl", "0").toIntOrNull() ?: 0
-                          if (lv >= 1) toast("رجعت للمكان: " + (if (seriesName.isNotBlank()) seriesName.substringBefore(" • ") else "المسلسل"))
-                          else toast("رجعت للقسم: " + (if (kind == "movie") "أفلام" else "مسلسلات"))
-                      } catch (t: Throwable) {
-                          Crash.log(t)
-                          Crash.note("RET-FAIL", (t.message ?: t.javaClass.simpleName) + " lvl=" + sp.s("ret_lvl"))
-                          try { rvGrid.post { scrollToLast() } } catch (e: Throwable) {}
-                      }
+                      tryRestore()
                   }
                   evRec = Events.register(this) { type, _ ->
                       if (type == "catalog") runOnUiThread {
                           try { softRefresh() } catch (t: Throwable) { Crash.log(t) }
                       }
+                  }
+              }
+
+              /** v8.23: المشغل يرسل أمر «استعادة» مع الإنتنت ⇒ نستعيد المكان مباشرة (لا نعتمد على أي حالة داخلية). */
+              override fun onNewIntent(i: Intent?) {
+                  super.onNewIntent(i)
+                  intent = i
+                  if (i?.getStringExtra("kind")?.let { it == "movie" || it == "series" } == true) kind = i.getStringExtra("kind")!!
+                  if (i?.getStringExtra("restore") == "1") {
+                      Crash.note("NEWINTENT", "restore=1 kind=" + kind)
+                      tryRestore()
+                  }
+              }
+
+              /** استعادة مكان الرجوع — تُنادى من كل المسارات (onResume / onNewIntent / onCreate). */
+              private fun tryRestore() {
+                  try {
+                      Crash.note("RET", "kind=" + sp.s("ret_kind") + " lvl=" + sp.s("ret_lvl") +
+                          " eps=" + sp.s("ret_eps").length + " seasons=" + sp.s("ret_seasons").length +
+                          " saved=" + sp.s("ret_saved").length + " played=" + sp.s("ret_played_name"))
+                      restoreReturn()
+                      focusGrid()
+                      val i = items.indexOfFirst {
+                          (lastPlayedUrl.isNotBlank() && it.url == lastPlayedUrl) ||
+                          (lastPlayedId.isNotBlank() && it.id == lastPlayedId && it.name == lastName)
+                      }
+                      if (i >= 0) { rvGrid.scrollToPosition(i); focusOn(i) }
+                      sp.put("ret_pending", "0")
+                      val lv = sp.s("ret_lvl", "0").toIntOrNull() ?: 0
+                      if (lv >= 1) toast("رجعت للمكان: " + (if (seriesName.isNotBlank()) seriesName.substringBefore(" • ") else "المسلسل"))
+                      else toast("رجعت للقسم: " + (if (kind == "movie") "أفلام" else "مسلسلات"))
+                  } catch (t: Throwable) {
+                      Crash.log(t)
+                      Crash.note("RET-FAIL", (t.message ?: t.javaClass.simpleName) + " lvl=" + sp.s("ret_lvl"))
+                      try { rvGrid.post { scrollToLast() } } catch (e: Throwable) {}
                   }
               }
 
@@ -2851,6 +2879,7 @@ jobs:
                   cur = c
                   retries = 0
                   usingAlt = false
+                  queries.clear(); candIdx = 0            // لا تبقى أوامر عنصر سابق (كانت تُشغّل قناة غلط)
                   pushRecent(c)
                   var url = c.url.ifBlank { c.alt }
                   val p = Catalog.profile
@@ -2859,6 +2888,7 @@ jobs:
                   if (p?.type == "mac") {
                       if (url.isBlank()) url = Stalker.localCmd(c.id.ifBlank { c.mid })   // أمر MAG من المعرّف
                       if (url.isBlank()) { toast("لا يوجد أمر تشغيل لهذا العنصر"); return }
+                      c.url = url                            // مهم: الأمر يصل للبوابة حتى لو كان مُستنبطًا
                       // مثل كود Java: القناة المباشرة رابطها جاهز → تُشغَّل مباشرة بلا create_link
                       if (c.kind == "live" && directUrl(url)) {
                           resolvedLive = false
@@ -3384,12 +3414,20 @@ jobs:
                */
               private fun armStartWatch() {
                   startTask?.let { h.removeCallbacks(it) }
-                  val r = Runnable {
-                      if (isFinishing || isDestroyed) return@Runnable
-                      if (!playStarted) tryNextCand("تأخّر/فشل المصدر")
+                  // القنوات الحية تتأخّر في التحميل: لا نُغيّر مصدرها إلا إذا توقّف المشغّل فعلًا
+                  val r = object : Runnable {
+                      override fun run() {
+                          if (isFinishing || isDestroyed) return
+                          if (playStarted) return
+                          val live = cur?.kind == "live"
+                          val st = try { player?.playbackState } catch (t: Throwable) { -1 }
+                          if (live && st != Player.STATE_IDLE) { h.postDelayed(this, 15_000); return }  // يجمّع البيانات: انتظر
+                          if (candIdx + 1 < queries.size) { tryNextCand("تأخّر المصدر"); return }
+                          h.postDelayed(this, 20_000)     // بلا بدائل: ننتظر ولا نُعلن الفشل (بلا تجمّد)
+                      }
                   }
                   startTask = r
-                  h.postDelayed(r, 12_000)
+                  h.postDelayed(r, if (cur?.kind == "live") 25_000 else 12_000)
               }
 
               private fun clearStartWatch() {
@@ -3884,6 +3922,7 @@ jobs:
                       val k = sp.s("ret_kind").ifBlank { if (cur?.kind == "episode") "series" else "movie" }
                       val i = Intent(this, GridActivity::class.java)
                       i.putExtra("kind", if (k == "series") "series" else "movie")
+                      i.putExtra("restore", "1")               // v8.23: أمر صريح للشاشة باستعادة المكان
                       i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                       Crash.note("BACK", "to grid kind=" + k + " lvl=" + sp.s("ret_lvl") + " played=" + sp.s("ret_played_name"))
                       startActivity(i)
@@ -6031,7 +6070,18 @@ jobs:
                   if (mag.isNotBlank() && mag != c0) for (t in arrayOf("vod", "itv", "series")) {
                       addQuery(out, "type=$t&action=create_link&cmd=" + Uri.encode(mag) + "&js_price=0&forced_country=")
                   }
-                  if (out.size > 24) { val cut = ArrayList(out.subList(0, 24)); return cut }
+                  // (5) **مهم للقنوات**: الأمر كما هو — لو كان رابطًا (حتى `http://localhost/ch/12_`) نصلّح
+                  //     المضيف ونشغّله مباشرة. هذا هو مسار «القناة تشتغل» الذي كان في 8.20 وضاع في 8.21.
+                  val rawU = done(cleanCmd(cmd))
+                  if (rawU.startsWith("http://") || rawU.startsWith("https://") || rawU.startsWith("rtsp://") ||
+                      rawU.startsWith("udp://") || rawU.startsWith("rtmp") || rawU.startsWith("mms")) {
+                      addQuery(out, rawU)
+                  }
+                  val magU = done(mag)
+                  if (magU.isNotBlank() && magU != rawU &&
+                      (magU.startsWith("http://") || magU.startsWith("https://"))) addQuery(out, magU)
+
+                  if (out.size > 26) { val cut = ArrayList(out.subList(0, 26)); return cut }
                   return out
               }
 
@@ -6043,11 +6093,29 @@ jobs:
               /** يُنفّذ أمرًا واحدًا ويُرجع الرابط (أو "" عند الفشل). */
               fun resolveQuery(q: String): String {
                   return try {
+                      // مرشّح رابط جاهز (بلا create_link)؟ يُشغّل كما هو
+                      if (q.startsWith("http://") || q.startsWith("https://") || q.startsWith("rtsp://") ||
+                          q.startsWith("udp://") || q.startsWith("rtmp") || q.startsWith("mms")) return done(q)
                       val r = req(q) ?: return ""
                       diagEps(q)
-                      done(urlFrom(r))
+                      var u = done(urlFrom(r))
+                      if (u.isBlank()) {
+                          // بعض البوابات ترد بأمر داخلي (cmd جديد) ⇒ نعيد create_link به (نفس 8.20)
+                          val inner = innerCmd(r)
+                          if (inner.isNotBlank() && inner != uriQ(q)) {
+                              val t = Regex("type=([a-z]+)").find(q)?.groupValues?.get(1) ?: "vod"
+                              val r2 = req("type=$t&action=create_link&cmd=" + Uri.encode(inner) + "&js_price=0&forced_country=")
+                              if (r2 != null) u = done(urlFrom(r2))
+                          }
+                      }
+                      u
                   } catch (t: Throwable) { Crash.log(t); "" }
               }
+
+              private fun uriQ(q: String): String = try {
+                  val raw = Regex("cmd=([^&]*)").find(q)?.groupValues?.get(1) ?: ""
+                  if (raw.isBlank()) "" else java.net.URLDecoder.decode(raw, "UTF-8")
+              } catch (t: Throwable) { "" }
 
               /**
                * نفس playQueries لكن ينفّذ حتى أول رابط ينجح (للتوافق مع الاستدعاءات القديمة).
@@ -7805,7 +7873,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.22 (code 822)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.23 (code 823)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
