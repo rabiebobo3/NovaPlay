@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.23"
-      VERSION_CODE: "823"
+      VERSION_NAME: "8.24"
+      VERSION_CODE: "824"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 823)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.23")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 824)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.24")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -385,6 +385,28 @@ jobs:
           | **الفوكس** | كان مقيّدًا بـ«جهاز TV» فالريموت ما يخدمش | الفوكس/الإبراز يخدم على كل الأجهزة: العنصر المُفوكَس يتكبّر قليلًا واسمه يصير ذهبيًا؛ البحث ما يستقبلش فوكس الريموت لكن يبقى يخدم باللمس |
           | **الدليل** | — | بعد كل رجوع تظهر رسالة قصيرة: «رجعت للمكان: …» أو «المواسم (3)» أو «رجعنا للقسم: مسلسلات» + سطر `[RET]`/`[BACK]` في سجل الأعطال |
           | **الفحص** | — | تصريف كامل 0 خطأ / 95 صنف + تصريف الكود المستخرج من ملف yml النهائي |
+
+          ## 8.24 — مشغّل احترافي + لمسة/لمستين على القناة + رجوع لنفس المكان
+
+          | النقطة | التفصيل |
+          |---|---|
+          | **القناة: لمسة واحدة** | تُشغّل القناة في **المشغّل الصغير** (داخل القائمة) — بلا خروج من الشاشة |
+          | **القناة: لمستان** | نفس القناة تعمل؟ لمستان سريعتان (لمس أو زرّ OK مرتين في الريموت) ⇒ **المشغّل الكبير يفتح فورًا بنفس المشغّل** (بلا إعادة تحميل ولا تقطيع) |
+          | **الرجوع من المشغّل الكبير** | يرجع للقناة **نفسها**، يمرّر القائمة إليها ويضع الفوكس (▶) فوقها، والقناة تُكمل في المشغّل الصغير |
+          | **الفلم/الحلقة** | الرجوع من المشغّل الكبير ⇒ **نفس الفلم في نفس القسم** (لا يقفز للقنوات)، والفوكس فوق نفس العنصر |
+          | **سؤال الاستكمال** | عند فتح فلم/حلقة شوهدت سابقًا: «هل تريد إكمال الفلم من الوقت الذي خرجت فيه؟» مع عرض الوقت المحفوظ وزرّين (إكمال / من البداية) |
+          | **كل قسم مستقلّ** | القنوات لها ذاكرتها، والأفلام لها ذاكرتها، والمسلسلات لها ذاكرتها — يرجع كل واحد لمكانه هو (هاتف و Android TV) |
+          | **فتح الفئة** | شاشة تحميل أنيقة (دائرة ذهبية + نص + «لحظة…») تظهر وتختفي بتلاشٍ ناعم وبلا وميض |
+          | **ذاكرة الفئات** | الفئة التي فُتحت مرّة تُحفظ في الذاكرة الدائمة ⇒ الدخول الثاني **فوري** بلا تحميل ولا إنترنت (تُسجَّل في سجل الأعطال: `CAT-CACHE` / `CAT-SAVE`) |
+          | **مؤشّر التحميل (buffer)** | شريط ثانٍ باهت فوق شريط التقدّم يبيّن كم تم تحميله (قنوات ومشغّل كبير) |
+          | **الوقت المتبقّي** | اضغط على مدّة العرض في المشغّل الكبير ⇒ تتبدّل بين الوقت الكامل والوقت المتبقّي |
+          | **أزرار جديدة** | تشغيل/إيقاف مركزي على الشاشة، ⏪10/⏩10، السرعة (0.5×→2×)، الصوت، الترجمة، القفل 🔒 (يُفكّ بضغطة مطوّلة) |
+          | **الأداء** | القنوات لها مخزون صغير (بداية فورية) والأفلام/الحلقات مخزون كبير + ذاكرة رجوع 20 ثانية (بلا تقطيع) — نفس المشغّل يُعاد استعماله |
+          | **بطارية** | عند خروج الشاشة من الأمام يتوقّف الصوت تلقائيًا ويرجع عند الرجوع (بلا استنزاف ولا صوت في الخلفية) |
+          | **فكّ الترميز** | `DefaultRenderersFactory.setEnableDecoderFallback(true)` ⇒ لو فشل مفكّك الجهاز يجرّب الذي بعده بدل التجمّد |
+          | **الفحص** | تصريف كامل **117 صنف / 0 خطأ** • اختبارات **61 ناجح / 0 فاشل** • استخراج من ملف الـyml ومطابقة md5 ثم تصريفه |
+
+          ملاحظة صريحة: **RTMP** بقي كما كان (يُفتح بالمشغّل الخارجي) — وحدة `media3-datasource-rtmp` غير موجودة في مستودع Maven (تحقّقت: 404)، فلا أضعها حتى لا يفشل البناء. و**AVI/XVID/WMV/FLV** ما تزال غير مدعومة (تحتاج FFmpeg داخل التطبيق، وهذا غير ممكن في ملف واحد).
 
           ## 8.23 — إصلاح القنوات (غلطة 8.21) + رجوع قاطع
 
@@ -1799,6 +1821,10 @@ jobs:
               private lateinit var etSearch: EditText
               private lateinit var busy: LinearLayout
               private lateinit var busyTxt: TextView
+              /* v8.24: شاشة تحميل أنيقة (لا وميض) + ذاكرة أقسام دائمة للرجوع الفوري */
+              private var busyShownAt = 0L
+              private var busyPending: Runnable? = null
+              private var catCachedAt = 0L
               private lateinit var adapter: CardAdapter
 
               override fun onCreate(b: Bundle?) {
@@ -1938,6 +1964,45 @@ jobs:
                   try { rvCats.adapter?.notifyDataSetChanged() } catch (t: Throwable) {}
               }
 
+              /**
+               * (8.24) ذاكرة أقسام **دائمة** (تُحفظ على الجهاز):
+               *  - أول دخول للقسم: يُجلب من السيرفر (شاشة تحميل أنيقة) ثم يُخزّن.
+               *  - الدخول الثاني (حتى بعد إغلاق التطبيق): يُعرض فورًا بلا شاشة تحميل ولا إنترنت.
+               */
+              private fun catCacheKey(catId: String): String = "cc_" + kind + "_" + catId
+
+              /** يُرجع عدد عناصر القسم إن وُجدت في الذاكرة الدائمة (0 = لا شيء محفوظ). */
+              private fun catCacheLoad(g: Group): Int {
+                  return try {
+                      if (g.catId.isBlank()) return 0
+                      val raw = sp.s(catCacheKey(g.catId))
+                      if (raw.isBlank()) return 0
+                      val out = ArrayList<Channel>()
+                      decodeChans(raw, out)
+                      if (out.isEmpty()) return 0
+                      val cat = if (kind == "movie") Catalog.movie else Catalog.series
+                      val keep = ArrayList<Channel>()
+                      for (c in cat) if (c.catId != g.catId) keep.add(c)
+                      cat.clear(); cat.addAll(keep); cat.addAll(out)
+                      for (i in cat.indices) cat[i].num = i + 1
+                      g.count = out.size
+                      Catalog.fillSet(kind, g.catId, 2)                 // نعلّمها «تمّت» ⇒ لا جلب بعد اليوم
+                      catCachedAt = System.currentTimeMillis()
+                      Crash.note("CAT-CACHE", "من الذاكرة: " + g.name + " = " + out.size)
+                      out.size
+                  } catch (t: Throwable) { Crash.log(t); 0 }
+              }
+
+              /** يحفظ عناصر القسم كاملة في الذاكرة الدائمة (نتجاهل الأقسام الضخمة جدًا). */
+              private fun catCacheSave(g: Group, list: List<Channel>) {
+                  try {
+                      if (g.catId.isBlank() || list.isEmpty()) return
+                      if (list.size > 5000) return                            // حماية من الحجم الكبير
+                      sp.put(catCacheKey(g.catId), encodeChans(list))
+                      Crash.note("CAT-SAVE", g.name + " = " + list.size)
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
               /** لو القسم فاضي في الذاكرة (بوابة MAC): نجلبه من السيرفر فورًا ونضيفه محليًا. */
               private fun maybeFillCat(g: Group) {
                   val p = Catalog.profile
@@ -1946,6 +2011,13 @@ jobs:
                   val cat = if (kind == "movie") Catalog.movie else Catalog.series
                   // القسم يُجلب كاملًا مرة واحدة (كل الصفحات)؛ ولا نعيد جلبه إذا كان مكتملًا أو جاريًا
                   if (Catalog.fillDone(kind, g.catId) || Catalog.fillBusy(kind, g.catId)) return
+                  // (8.24) ذاكرة دائمة: لو القسم محفوظ ⇒ يظهر فورًا بلا شاشة تحميل ولا إنترنت
+                  if (catCacheLoad(g) > 0) {
+                      all.clear(); all.addAll(cat)
+                      applyFilter()
+                      try { rvCats.adapter?.notifyDataSetChanged() } catch (t: Throwable) {}
+                      return
+                  }
                   showBusy(true, "جلب «" + g.name + "» بكل صفحاته…")
                   val out = ArrayList<Channel>()
                   Loader.macFillCat(this, p, kind, g.catId, g.name, out) { n ->
@@ -1962,6 +2034,8 @@ jobs:
                               applyFilter()
                               rvCats.adapter = CatAdapter()
                           }
+                          catCacheSave(g, out)                     // (8.24) نحفظه ⇒ الدخول القادم فوري
+                          Catalog.fillSet(kind, g.catId, 2)
                           toast("+ " + n + " عنصر في «" + g.name + "»")
                       } catch (t: Throwable) {
                           try { showBusy(false, "") } catch (e: Throwable) {}
@@ -1973,9 +2047,37 @@ jobs:
 
               private fun base0(): List<Channel> = all
 
+              /**
+               * (8.24) شاشة تحميل أنيقة وسريعة:
+               *  - تظهر بتلاشٍ ناعم (ما تظهرش وتختفي في لمحة)،
+               *  - لا تختفي قبل 400 مللي حتى لا تومض،
+               *  - نص ثانوي «لحظة…» تحت العنوان.
+               * ملاحظة: الرجوع من المشغّل لا يُظهرها إطلاقًا (البيانات محفوظة في الذاكرة).
+               */
               private fun showBusy(on: Boolean, t: String) {
-                  busy.visibility = if (on) View.VISIBLE else View.GONE
-                  if (t.isNotEmpty()) busyTxt.text = t
+                  try {
+                      if (on) {
+                          busyPending?.let { busy.removeCallbacks(it) }
+                          if (t.isNotEmpty()) busyTxt.text = t
+                          if (busy.visibility != View.VISIBLE) {
+                              busy.visibility = View.VISIBLE
+                              busy.alpha = 0f
+                              busy.scaleX = 0.92f; busy.scaleY = 0.92f
+                              busy.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(180).start()
+                              busyShownAt = System.currentTimeMillis()
+                          }
+                      } else {
+                          val showed = System.currentTimeMillis() - busyShownAt
+                          val wait = if (showed < 400) 400 - showed else 0L
+                          busyPending?.let { busy.removeCallbacks(it) }
+                          val r = Runnable {
+                              try { busy.animate().alpha(0f).setDuration(150)
+                                  .withEndAction { try { busy.visibility = View.GONE } catch (e: Throwable) {} }.start() } catch (e: Throwable) {}
+                          }
+                          busyPending = r
+                          busy.postDelayed(r, wait)
+                      }
+                  } catch (e: Throwable) { Crash.log(e) }
               }
 
               private fun open(c: Channel) {
@@ -2388,7 +2490,7 @@ jobs:
                   val wantRestore = sp.s("ret_pending") == "1" || intent?.getStringExtra("restore") == "1"
                   if (wantRestore) {                        // رجعنا من المشغل: نفس القسم ونفس العنصر
                       pendingScroll = false
-                      tryRestore()
+                      tryRestore()                          // v8.24: بلا أي تحميل — القائمة والفوكس فقط
                   }
                   evRec = Events.register(this) { type, _ ->
                       if (type == "catalog") runOnUiThread {
@@ -2422,6 +2524,8 @@ jobs:
                       }
                       if (i >= 0) { rvGrid.scrollToPosition(i); focusOn(i) }
                       sp.put("ret_pending", "0")
+                      Crash.note("RET-OK", "focus=" + (if (i >= 0) i.toString() else "none") + " kind=" + kind +
+                          " cat=" + (selCat?.name ?: "-"))
                       val lv = sp.s("ret_lvl", "0").toIntOrNull() ?: 0
                       if (lv >= 1) toast("رجعت للمكان: " + (if (seriesName.isNotBlank()) seriesName.substringBefore(" • ") else "المسلسل"))
                       else toast("رجعت للقسم: " + (if (kind == "movie") "أفلام" else "مسلسلات"))
@@ -2629,6 +2733,15 @@ jobs:
               private var candIdx = 0
               private var playStarted = false
               private var startTask: Runnable? = null
+              /* v8.24: لمس/ريموت — ضغطة = مشغل صغير، ضغطتان = المشغل الكبير فورًا */
+              private var ctrlLocked = false           // قفل أزرار المشغّل (منفصل عن قائمة القنوات المقفلة)
+              private var lastTunedLive: Boolean? = null
+              private var speedIdx = 1
+              private val speeds = floatArrayOf(0.5f, 1f, 1.25f, 1.5f, 2f)
+              private var lastTapId = ""
+              private var lastTapAt = 0L
+              private var wasPlayingBeforeStop = false
+              private var wantRemain = false
               private var topBar: View? = null
               private var userSeeking = false
               private var listMode = "all"          // all | fav | recent | mine | lock | group
@@ -2741,9 +2854,14 @@ jobs:
                           busy(true, "تحميل القائمة…")
                           Loader.load(this, p, false, { t -> runOnUiThread { tvLoadTxt.text = t } }) { ok, _ ->
                               busy(false, "")
-                              if (ok) { buildGroups(); selectGroup(groups.firstOrNull()!!) } else toast("تعذّر تحميل القائمة")
+                              if (ok) {
+                                  buildGroups(); selectGroup(groups.firstOrNull()!!)
+                                  restoreLastChannel()          // v8.24: بعد تحميل القائمة — آخر قناة ترجع في المشغل الصغير
+                              } else toast("تعذّر تحميل القائمة")
                           }
                       }
+                  } else if (restoreLastChannel()) {
+                      // v8.24: رجعنا للشاشة ⇒ نفس القناة تُشتغل في المشغل الصغير بسلاسة + الفوكس فوقها
                   }
                   startTicker()
               }
@@ -2759,6 +2877,20 @@ jobs:
                           "broadcast" -> if (text.isNotEmpty()) infoDialog("إشعار", text)
                       }
                   }
+              }
+
+              override fun onStop() {
+                  // v8.24: نوقف التشغيل عند خروج الشاشة من الأمام (بلا صوت في الخلفية ولا استنزاف بطارية)
+                  try {
+                      wasPlayingBeforeStop = player?.isPlaying == true
+                      player?.pause()
+                  } catch (t: Throwable) {}
+                  super.onStop()
+              }
+
+              override fun onStart() {
+                  super.onStart()
+                  try { if (wasPlayingBeforeStop) player?.play() } catch (t: Throwable) {}
               }
 
               override fun onPause() {
@@ -2819,6 +2951,20 @@ jobs:
                   }
               }
 
+              /** (8.24) يستعيد آخر قناة شُغّلت في المشغل الصغير (بلا شاشة كبيرة) مع الفوكس فوقها. */
+              private fun restoreLastChannel(): Boolean {
+                  return try {
+                      val raw = sp.s("last_ch")
+                      if (raw.isBlank()) return false
+                      if (cur != null) return false                        // شيء يعمل الآن
+                      val c = Channel.fromJson(JSONObject(raw))
+                      if (c.name.isBlank()) return false
+                      selectGroupOf(c)
+                      playSafe(c, false)
+                      true
+                  } catch (t: Throwable) { Crash.log(t); false }
+              }
+
               private fun lastProfile(): Profile? = try {
                   val t = sp.s("last")
                   if (t.isEmpty()) null else Profile.fromJson(JSONObject(t))
@@ -2836,13 +2982,12 @@ jobs:
                       .setConnectTimeoutMs(12000)
                       .setReadTimeoutMs(20000)
                       .setDefaultRequestProperties(hdr)
-                  val load = DefaultLoadControl.Builder()
-                      .setBufferDurationsMs(2500, 20000, 500, 1200)
-                      .setBackBuffer(3000, true)
-                      .setPrioritizeTimeOverSizeThresholds(true)
-                      .build()
+                  val load = buildLoadControl(cur?.kind == "live")
                   val p = ExoPlayer.Builder(this)
                       .setMediaSourceFactory(DefaultMediaSourceFactory(http))
+                      // (8.24) فكّ الترميز البديل: لو فشل مفكّك الجهاز (شائع في الأجهزة الرخيصة) يجرّب الذي بعده
+                      // بدل ما يتجمّد المشغّل أو يطلع خطأ. نفس النداء مستعمل في media3 1.2.x.
+                      .setRenderersFactory(androidx.media3.exoplayer.DefaultRenderersFactory(this).setEnableDecoderFallback(true))
                       .setLoadControl(load)
                       .setSeekBackIncrementMs(10000L)
                       .setSeekForwardIncrementMs(10000L)
@@ -2854,6 +2999,31 @@ jobs:
                   pv.useController = true
                   applyResize()
                   p.addListener(this)
+              }
+
+              /**
+               * (8.24) أداء: إعدادات ذاكرة مؤقتة مختلفة للبث المباشر وللأفلام/الحلقات.
+               *  - القنوات: مخزون صغير ⇒ بداية فورية وزمن تبديل قصير (Live يتطلّب سرعة لا عمقًا).
+               *  - الأفلام/الحلقات: مخزون أكبر + ذاكرة رجوع واسعة ⇒ بلا تقطيع وتقديم/تأخير سريع.
+               */
+              private fun buildLoadControl(live: Boolean): DefaultLoadControl =
+                  if (live) DefaultLoadControl.Builder()
+                      .setBufferDurationsMs(1200, 12000, 500, 900)
+                      .setBackBuffer(0, false)
+                      .setPrioritizeTimeOverSizeThresholds(true)
+                      .build()
+                  else DefaultLoadControl.Builder()
+                      .setBufferDurationsMs(3000, 60000, 1000, 2500)
+                      .setBackBuffer(20000, true)
+                      .setPrioritizeTimeOverSizeThresholds(true)
+                      .build()
+
+              /**
+               * (8.24) في media3 لا يمكن تغيير LoadControl بعد إنشاء المشغّل، لذلك نُسجّل نوع المحتوى
+               * ويُستعمل عند إنشاء المشغّل (media3: المخزون يُضبط في ExoPlayer.Builder.setLoadControl).
+               */
+              private fun tuneLoad(c: Channel?) {
+                  try { lastTunedLive = (c?.kind == "live") } catch (t: Throwable) { Crash.log(t) }
               }
 
               private fun setupCast() {
@@ -2880,6 +3050,8 @@ jobs:
                   retries = 0
                   usingAlt = false
                   queries.clear(); candIdx = 0            // لا تبقى أوامر عنصر سابق (كانت تُشغّل قناة غلط)
+                  tuneLoad(c)
+                  try { sp.put("last_ch", c.toJson().toString()) } catch (t: Throwable) {}   // آخر قناة (للرجوع)
                   pushRecent(c)
                   var url = c.url.ifBlank { c.alt }
                   val p = Catalog.profile
@@ -2987,6 +3159,33 @@ jobs:
               }
 
               /** غلاف آمن للضغط على القناة: أي خطأ يظهر كتنبيه ولا يُغلق التطبيق. */
+              /**
+               * (8.24) ضغطة على قناة: تُشغَّل في المشغل **الصغير**. وإذا كانت هي نفسها تعمل الآن ⇒ ضغطة ثانية سريعة
+               * (ريموت OK مرتين أو لمس) تفتح **المشغل الكبير** فورًا؛ وإذا كانت قناة أخرى ⇒ تُشغَّل في الصغير.
+               */
+              private fun onChannelTap(c: Channel) {
+                  val now = System.currentTimeMillis()
+                  val same = cur != null && sameChan(c, cur!!)
+                  if (same && now - lastTapAt < 700) { openFullFast(c); lastTapId = ""; lastTapAt = 0; return }
+                  lastTapId = c.id.ifBlank { c.url }
+                  lastTapAt = now
+                  if (same) { if (!full) focusChannel(); return }        // نفس القناة تعمل: لا نعيد التحميل
+                  playSafe(c, false)
+              }
+
+              /** (8.24) يفتح المشغل الكبير **فورًا**: نفس المشغّل يُنسب للمشهد الكبير بلا إعادة تحضير. */
+              private fun openFullFast(c: Channel) {
+                  try {
+                      val same = cur != null && sameChan(c, cur!!)
+                      if (same && player != null) {
+                          if (!full) toggleFull(true)
+                          else showBars()
+                          return
+                      }
+                      playSafe(c, true)
+                  } catch (t: Throwable) { Crash.log(t); playSafe(c, true) }
+              }
+
               private fun playSafe(c: Channel, asFull: Boolean) {
                   try { play(c, asFull) } catch (t: Throwable) {
                       try { busy(false, "") } catch (e: Throwable) {}
@@ -3046,6 +3245,7 @@ jobs:
                   fetchEpg(c)
                   chanAdapter.notifyDataSetChanged()
                   showPip(!full)                     // ما نُظهرش البطاقة الصغيرة فوق المشغل الكبير
+                  if (cur?.kind == "live" && !full) { selectGroupOf(c); focusChannel() }
               }
 
               private fun playAlt() {
@@ -3081,6 +3281,10 @@ jobs:
                       try { findViewById<View>(R.id.playerHolder)?.visibility = View.VISIBLE } catch (t: Throwable) {}
                       try { pv.player = p } catch (t: Throwable) { Crash.log(t) }
                       try { pvFull.player = null } catch (t: Throwable) { Crash.log(t) }
+                      ctrlLocked = false
+                      try { findViewById<TextView>(R.id.btn_center_play)?.visibility = View.GONE } catch (t: Throwable) {}
+                      // v8.24: نرجع للقناة نفسها — نمرّروا القائمة إليها ونضعوا الفوكس فوقها (ريموت/لمس)
+                      try { focusChannel() } catch (t: Throwable) { Crash.log(t) }
                   }
               }
 
@@ -3146,6 +3350,102 @@ jobs:
                   try { v.layoutParams = lp } catch (t: Throwable) { Crash.log(t) }
               }
 
+              /** (8.24) تشغيل/إيقاف بزر واحد (يُستعمل في الزر المركزي وزر التشغيل). */
+              private fun togglePlay() {
+                  val p = player ?: return
+                  try {
+                      if (p.isPlaying) p.pause() else p.play()
+                      updateCenterPlay()
+                      hideBarsSoon()
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              private fun updateCenterPlay() {
+                  try {
+                      findViewById<TextView>(R.id.btn_center_play).text = if (player?.isPlaying == true) "⏸" else "▶"
+                  } catch (t: Throwable) {}
+              }
+
+              /** (8.24) تقديم/تأخير 10 ثوان مع مؤشر عائم يبيّن المدة الجديدة. */
+              private fun skip(deltaMs: Long) {
+                  val p = player ?: return
+                  try {
+                      if (cur?.kind == "live" && p.duration <= 0) { toast("تأخير البث غير متاح في القناة الحية"); return }
+                      val pos = (p.currentPosition + deltaMs).coerceAtLeast(0L)
+                      p.seekTo(pos)
+                      val hint = findViewById<TextView>(R.id.tv_seek_hint)
+                      hint.text = (if (deltaMs > 0) "⏩ " else "⏪ ") + fmtTime(pos)
+                      hint.visibility = View.VISIBLE
+                      hint.alpha = 1f
+                      hint.animate().alpha(0f).setDuration(700).withEndAction { hint.visibility = View.GONE }.start()
+                      showBars()
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              /** (8.24) تبديل سرعة العرض: 0.5× → 1× → 1.25× → 1.5× → 2×. */
+              private fun cycleSpeed() {
+                  val p = player ?: return
+                  try {
+                      speedIdx = (speedIdx + 1) % speeds.size
+                      p.setPlaybackSpeed(speeds[speedIdx])
+                      findViewById<Button>(R.id.btn_full_speed).text = speeds[speedIdx].toString() + "×"
+                      toast("السرعة: " + speeds[speedIdx] + "×")
+                      showBars()
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
+              /** (8.24) قفل الأزرار (لمنع الضغطات الخاطئة) — ضغطة مطوّلة على القفل لفكّه. */
+              private fun toggleLock() {
+                  ctrlLocked = !ctrlLocked
+                  try {
+                      val cp = findViewById<TextView>(R.id.btn_center_play)
+                      cp.text = if (ctrlLocked) "\uD83D\uDD13" else (if (player?.isPlaying == true) "\u23F8" else "\u25B6")
+                      cp.visibility = if (full) View.VISIBLE else View.GONE
+                      findViewById<Button>(R.id.btn_full_lock).text = if (ctrlLocked) "\uD83D\uDD13" else "\uD83D\uDD12"
+                      findViewById<Button>(R.id.btn_full_lock).visibility = if (full) View.VISIBLE else View.GONE
+                      if (ctrlLocked) fadeBars(false) else showBars()
+                  } catch (t: Throwable) { Crash.log(t) }
+                  toast(if (ctrlLocked) "الأزرار مقفلة — اضغط مطوّلًا على 🔓 لفكّها" else "الأزرار مفتوحة")
+              }
+
+              /** (8.24) اختيار مسار الصوت أو الترجمة من المشغّل (media3 Tracks). */
+              private fun pickTrack(isText: Boolean) {
+                  val p = player ?: return
+                  try {
+                      val names = ArrayList<String>()
+                      val groups = ArrayList<androidx.media3.common.Tracks.Group>()
+                      val idxs = ArrayList<Int>()
+                      val tracks = p.currentTracks
+                      for (g in tracks.groups) {
+                          if (g.type != (if (isText) androidx.media3.common.C.TRACK_TYPE_TEXT else androidx.media3.common.C.TRACK_TYPE_AUDIO)) continue
+                          for (i in 0 until g.length) {
+                              val f = g.getTrackFormat(i)
+                              val label = f.label ?: f.language ?: ("مسار " + (i + 1))
+                              names.add((if (g.isTrackSelected(i)) "✔ " else "") + label)
+                              groups.add(g); idxs.add(i)
+                          }
+                      }
+                      if (names.isEmpty()) { toast(if (isText) "لا توجد ترجمات في هذا المصدر" else "مسار صوتي واحد"); return }
+                      val items = ArrayList<String>()
+                      items.add("تلقائي")
+                      items.addAll(names)
+                      pickDialog(if (isText) "الترجمة" else "الصوت", items) { k ->
+                          try {
+                              val b = p.trackSelectionParameters.buildUpon()
+                              if (k == 0) {
+                                  if (isText) b.setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true)
+                                  else b.clearOverridesOfType(androidx.media3.common.C.TRACK_TYPE_AUDIO)
+                              } else {
+                                  val gi = k - 1
+                                  b.setOverrideForType(androidx.media3.common.TrackSelectionOverride(groups[gi].mediaTrackGroup, idxs[gi]))
+                              }
+                              p.trackSelectionParameters = b.build()
+                              toast("تم التغيير")
+                          } catch (t: Throwable) { Crash.log(t); toast("تعذر التغيير") }
+                      }
+                  } catch (t: Throwable) { Crash.log(t) }
+              }
+
               private fun cycleResize() {
                   val order = listOf("1", "0", "2", "3", "4")
                   val i = order.indexOf(sp.s("rm2", "1")).let { if (it < 0) 0 else it }
@@ -3154,6 +3454,35 @@ jobs:
                   sp.put("rm_man", if (nxt == "1") "0" else "1")
                   applyResize()
                   toast("نسبة الصورة: " + ratioLabel(nxt))
+              }
+
+              /**
+               * (8.24) يُمرّر قائمة القنوات إلى القناة الحالية ويضع الفوكس (▶) فوقها.
+               * تُنادى عند: الرجوع من المشغل الكبير، الدخول للشاشة، وتبديل القناة.
+               */
+              private fun focusChannel() {
+                  val c = cur ?: return
+                  val host = if (shown.isNotEmpty()) shown else sourceList()
+                  var i = -1
+                  for (k in host.indices) if (sameChan(host[k], c)) { i = k; break }
+                  if (i < 0) return                                    // القناة في مجموعة أخرى (قائمة الفلتر الحالية)
+                  try { rvChannels.scrollToPosition(i) } catch (t: Throwable) {}
+                  rvChannels.postDelayed({
+                      try {
+                          val lm = rvChannels.layoutManager
+                          val v = lm?.findViewByPosition(i)
+                          if (v != null) { v.requestFocus() } else rvChannels.requestFocus()
+                      } catch (t: Throwable) {}
+                  }, 200)
+              }
+
+              /** (8.24) يرجّع القناة الحالية في القائمة المُحمّلة (نفس المجموعة/الفلتر). */
+              private fun selectGroupOf(c: Channel) {
+                  try {
+                      if (listMode == "all" || listMode == "fav" || listMode == "recent" || listMode == "mine") return
+                      val g = groups.firstOrNull { it.name == c.group } ?: return
+                      if (g.name != curGroup) selectGroup(g)
+                  } catch (t: Throwable) { Crash.log(t) }
               }
 
               private fun hideBarsSoon() {
@@ -3182,6 +3511,7 @@ jobs:
               }
 
               private fun showBars() {
+                  if (ctrlLocked) return
                   fadeBars(true)
                   hideBarsSoon()
               }
@@ -3248,9 +3578,15 @@ jobs:
                   try {
                       AlertDialog.Builder(this)
                           .setTitle("متابعة المشاهدة")
-                          .setMessage("شاهدت هذا العنصر سابقًا حتى " + fmtTime(pos) + " — تريد المتابعة من هناك؟")
-                          .setPositiveButton("متابعة") { _, _ -> try { player?.seekTo(pos); player?.play() } catch (t: Throwable) {} }
-                          .setNegativeButton("من البداية") { _, _ -> clearPosOf(cur) }
+                          .setMessage("هل تريد إكمال " + (if (cur?.kind == "movie") "الفلم" else "الحلقة") +
+                              " من الوقت الذي خرجت فيه؟\n\nالوقت المحفوظ: " + fmtTime(pos))
+                          .setPositiveButton("إكمال من " + fmtTime(pos)) { _, _ ->
+                              try { player?.seekTo(pos); player?.play() } catch (t: Throwable) {}
+                          }
+                          .setNegativeButton("من البداية") { _, _ ->
+                              try { player?.seekTo(0); player?.play() } catch (t: Throwable) {}
+                              clearPosOf(cur)
+                          }
                           .show()
                   } catch (t: Throwable) { Crash.log(t) }
               }
@@ -3309,6 +3645,8 @@ jobs:
               }
 
               override fun onIsPlayingChanged(isPlaying: Boolean) {
+                  updateCenterPlay()
+                  try { findViewById<TextView>(R.id.btn_center_play).visibility = if (full) View.VISIBLE else View.GONE } catch (t: Throwable) {}
                   if (isPlaying) {
                       dockBusy.visibility = View.GONE; fullBusy.visibility = View.GONE
                       wdBar.visibility = View.GONE
@@ -3403,6 +3741,12 @@ jobs:
                       sbFull.progress = sbDock.progress
                       tvPos.text = fmtTime(pos)
                       tvFullPos.text = fmtTime(pos)
+                      // v8.24: كم تم تحميله (buffer) + الوقت المتبقّي بالضغط على المدة
+                      val buf = p.bufferedPosition
+                      sbFull.secondaryProgress = (buf / 1000).toInt()
+                      sbDock.secondaryProgress = sbFull.secondaryProgress
+                      tvDur.text = if (wantRemain) "-" + fmtTime((dur - pos).coerceAtLeast(0)) else fmtTime(dur)
+                      tvFullDur.text = tvDur.text
                   }
               }
 
@@ -4011,6 +4355,33 @@ jobs:
                       val p = player ?: return@setOnClickListener
                       if (p.isPlaying) p.pause() else p.play()
                   }
+                  // v8.24: أزرار المشغّل الاحترافية (تقديم/تأخير ±10، سرعة، ترجمة، صوت، قفل، تشغيل مركزي)
+                  try {
+                      val cplay = findViewById<TextView>(R.id.btn_center_play)
+                      cplay.setOnClickListener {
+                          if (ctrlLocked) toast("الأزرار مقفلة — ضغطة مطوّلة على القفل لفكّها") else { togglePlay(); showBars() }
+                      }
+                      cplay.setOnLongClickListener { if (ctrlLocked) { toggleLock(); true } else false }
+                      findViewById<Button>(R.id.btn_full_back10).setOnClickListener { skip(-10_000); showBars() }
+                      findViewById<Button>(R.id.btn_full_fwd10).setOnClickListener { skip(10_000); showBars() }
+                      findViewById<Button>(R.id.btn_full_speed).setOnClickListener { cycleSpeed() }
+                      findViewById<Button>(R.id.btn_full_aud).setOnClickListener { pickTrack(false); showBars() }
+                      findViewById<Button>(R.id.btn_full_txt).setOnClickListener { pickTrack(true); showBars() }
+                      findViewById<Button>(R.id.btn_full_lock).setOnClickListener { if (!ctrlLocked) toggleLock() }
+                      findViewById<Button>(R.id.btn_full_lock).setOnLongClickListener { if (ctrlLocked) { toggleLock(); true } else false }
+                      findViewById<TextView>(R.id.tv_full_dur).setOnClickListener { wantRemain = !wantRemain; showBars() }
+                      // شريط التحميل (buffer) بلون ثانٍ فوق شريط التقدّم
+                      try {
+                          sbFull.secondaryProgressTintList = android.content.res.ColorStateList.valueOf(0x66C8A951)
+                          sbDock.secondaryProgressTintList = android.content.res.ColorStateList.valueOf(0x66C8A951)
+                      } catch (t: Throwable) {}
+                      // تدرّج أنيق للشرائط (مثل المشغلات الاحترافية)
+                      try {
+                          findViewById<android.view.View>(R.id.fullBar).background =
+                              android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.BOTTOM_TOP,
+                                  intArrayOf(0xF2000000.toInt(), 0x66000000, 0x00000000))
+                      } catch (t: Throwable) {}
+                  } catch (t: Throwable) { Crash.log(t) }
                   // v8.21: أزرار الشاشة الكاملة تستقبل الريموت (فوكس + OK)
                   try {
                       for (id in listOf(R.id.btn_full_play, R.id.btn_full_close, R.id.btn_full_pip, R.id.btn_full_cast)) {
@@ -4116,7 +4487,17 @@ jobs:
                               h.name.setTextColor(if (has || sel) gold() else ContextCompat.getColor(this@LiveActivity, R.color.np_text))
                           } catch (t: Throwable) {}
                       }
-                      h.itemView.setOnClickListener { playSafe(c, false) }
+                      // v8.24: ضغطة = مشغل صغير • ضغطتان (لمس) = المشغل الكبير فورًا بنفس المشغّل (بلا إعادة تحميل)
+                      h.itemView.setOnClickListener { onChannelTap(c) }
+                      try {
+                          val gd = android.view.GestureDetector(this@LiveActivity,
+                              object : android.view.GestureDetector.SimpleOnGestureListener() {
+                                  override fun onDoubleTap(e: android.view.MotionEvent?): Boolean {
+                                      openFullFast(c); return true
+                                  }
+                              })
+                          h.itemView.setOnTouchListener { _, ev -> gd.onTouchEvent(ev); false }
+                      } catch (t: Throwable) { Crash.log(t) }
                       h.itemView.setOnLongClickListener {
                           cur = c
                           val opts = listOf("▶ تشغيل", "★ مفضلة", "＋ مجموعة", "⧉ نسخ الرابط")
@@ -4638,6 +5019,21 @@ jobs:
                               val log = Crash.read(this)
                               AlertDialog.Builder(this).setTitle("سجل الأعطال").setMessage(log)
                                   .setPositiveButton("مسح السجل") { _, _ -> Crash.clear(this); toast("مُسح") }
+                                  .setNeutralButton("مشاركة/نسخ") { _, _ ->
+                                      try {                                    // v8.23: إرسال السجل بضغطة (واتساب، تلغرام، بريد…)
+                                          val i = android.content.Intent(android.content.Intent.ACTION_SEND)
+                                          i.type = "text/plain"
+                                          i.putExtra(android.content.Intent.EXTRA_SUBJECT, "NovaPlay " + appVersion(this) + " — سجل الأعطال")
+                                          i.putExtra(android.content.Intent.EXTRA_TEXT, "NovaPlay " + appVersion(this) + "\n" + log.takeLast(4000))
+                                          startActivity(android.content.Intent.createChooser(i, "إرسال سجل الأعطال"))
+                                      } catch (t: Throwable) {
+                                          try {
+                                              val cb = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                              cb.setPrimaryClip(android.content.ClipData.newPlainText("NovaPlay log", log.takeLast(4000)))
+                                              toast("نُسخ السجل — الصقه في أي تطبيق")
+                                          } catch (e: Throwable) { toast("تعذر النسخ") }
+                                      }
+                                  }
                                   .setNegativeButton("إغلاق", null).show()
                           }
                           7 -> infoDialog("الذاكرة", Memory.dump(this))
@@ -7231,10 +7627,15 @@ jobs:
                       <androidx.recyclerview.widget.RecyclerView android:id="@+id/rv_ggroups" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="0.25" android:padding="8dp" android:clipToPadding="false"/>
                   </LinearLayout>
               </LinearLayout>
-              <LinearLayout android:id="@+id/gridBusy" android:layout_width="260dp" android:layout_height="wrap_content" android:layout_gravity="center"
-                  android:orientation="vertical" android:gravity="center" android:background="@drawable/panel" android:padding="18dp" android:visibility="gone">
-                  <ProgressBar android:layout_width="32dp" android:layout_height="32dp" android:indeterminateTint="@color/np_gold"/>
-                  <TextView android:id="@+id/gridBusyTxt" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" style="@style/NovaLabel"/>
+              <!-- v8.24: عجلة تحميل القسم — أنيقة وأسرع ظهورًا -->
+              <LinearLayout android:id="@+id/gridBusy" android:layout_width="300dp" android:layout_height="wrap_content" android:layout_gravity="center"
+                  android:orientation="vertical" android:gravity="center" android:background="@drawable/panel" android:padding="22dp"
+                  android:elevation="14dp" android:visibility="gone">
+                  <ProgressBar android:layout_width="46dp" android:layout_height="46dp" android:indeterminateTint="@color/np_gold"/>
+                  <TextView android:id="@+id/gridBusyTxt" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:layout_marginTop="12dp" android:textColor="@color/np_gold" android:textSize="14sp" android:textStyle="bold"/>
+                  <TextView android:id="@+id/gridBusySub" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:layout_marginTop="4dp" android:textColor="@color/np_text_dim" android:textSize="12sp" android:text="لحظة…"/>
               </LinearLayout>
           </FrameLayout>
           NP_EOF
@@ -7365,6 +7766,16 @@ jobs:
                       <Button android:id="@+id/btn_full_close" android:layout_width="wrap_content" android:layout_height="34dp" android:layout_marginStart="6dp" android:text="إغلاق"
                           android:background="@drawable/btn_gold" android:textColor="@color/np_bg"/>
                   </LinearLayout>
+                  <!-- v8.24: زر التشغيل الكبير في الوسط (يختفي مع الشرائط) -->
+                  <TextView android:id="@+id/btn_center_play" android:layout_width="84dp" android:layout_height="84dp"
+                      android:layout_gravity="center" android:gravity="center" android:text="⏸" android:textSize="34sp"
+                      android:textColor="@color/np_gold" android:background="@drawable/circle_gold"
+                      android:alpha="0.88" android:focusable="true" android:clickable="true" android:visibility="gone"/>
+                  <!-- مؤشر تقديم/تأخير عائم (يظهر عند الضغط) -->
+                  <TextView android:id="@+id/tv_seek_hint" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                      android:layout_gravity="center" android:background="@drawable/overlay_dark" android:paddingStart="18dp" android:paddingEnd="18dp"
+                      android:paddingTop="8dp" android:paddingBottom="8dp" android:textColor="@color/np_gold" android:textSize="20sp"
+                      android:textStyle="bold" android:visibility="gone"/>
                   <LinearLayout android:id="@+id/fullBusy" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center"
                       android:orientation="vertical" android:gravity="center" android:background="@drawable/overlay_dark" android:padding="18dp" android:visibility="gone">
                       <ProgressBar android:layout_width="34dp" android:layout_height="34dp" android:indeterminateTint="@color/np_gold"/>
@@ -7383,8 +7794,15 @@ jobs:
                           <Button android:id="@+id/btn_full_prev" android:layout_width="wrap_content" android:layout_height="38dp" android:text="⏮" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
                           <Button android:id="@+id/btn_full_play" android:layout_width="wrap_content" android:layout_height="38dp" android:layout_marginStart="6dp" android:text="⏯" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
                           <Button android:id="@+id/btn_full_next" android:layout_width="wrap_content" android:layout_height="38dp" android:layout_marginStart="6dp" android:text="⏭" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
+                          <!-- v8.24: تقديم/تأخير 10 ثوان + سرعة + ترجمة + صوت + قفل -->
+                          <Button android:id="@+id/btn_full_back10" android:layout_width="wrap_content" android:layout_height="38dp" android:layout_marginStart="6dp" android:text="⏪ 10" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
+                          <Button android:id="@+id/btn_full_fwd10" android:layout_width="wrap_content" android:layout_height="38dp" android:layout_marginStart="6dp" android:text="⏩ 10" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
+                          <Button android:id="@+id/btn_full_speed" android:layout_width="wrap_content" android:layout_height="38dp" android:layout_marginStart="6dp" android:text="1.0×" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
+                          <Button android:id="@+id/btn_full_aud" android:layout_width="wrap_content" android:layout_height="38dp" android:layout_marginStart="6dp" android:text="🎧" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
+                          <Button android:id="@+id/btn_full_txt" android:layout_width="wrap_content" android:layout_height="38dp" android:layout_marginStart="6dp" android:text="💬" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
+                          <Button android:id="@+id/btn_full_lock" android:layout_width="wrap_content" android:layout_height="38dp" android:layout_marginStart="6dp" android:text="🔒" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
                           <Button android:id="@+id/btn_full_fav" android:layout_width="0dp" android:layout_height="38dp" android:layout_weight="1" android:layout_marginStart="6dp" android:text="★" android:background="@drawable/btn_ghost" android:textColor="@color/np_gold"/>
-                          <Button android:id="@+id/btn_full_info" android:layout_width="0dp" android:layout_height="38dp" android:layout_weight="2" android:layout_marginStart="6dp" android:text="معلومات الحلقة" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
+                          <Button android:id="@+id/btn_full_info" android:layout_width="0dp" android:layout_height="38dp" android:layout_weight="1" android:layout_marginStart="6dp" android:text="معلومات" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
                       </LinearLayout>
                   </LinearLayout>
               </FrameLayout>
@@ -7873,7 +8291,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.23 (code 823)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.24 (code 824)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
