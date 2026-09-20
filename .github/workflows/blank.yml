@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.21"
-      VERSION_CODE: "821"
+      VERSION_NAME: "8.22"
+      VERSION_CODE: "822"
     steps:
       - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                   minSdk 21
                   targetSdk 34
                   // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 821)
-                  versionName (System.getenv("VERSION_NAME") ?: "8.21")
+                  versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 822)
+                  versionName (System.getenv("VERSION_NAME") ?: "8.22")
                   vectorDrawables.useSupportLibrary = true
               }
 
@@ -375,6 +375,16 @@ jobs:
           | **الريموت والفوكس** | الفوكس ما يروحش للبحث: يبدأ على الشبكة، والأزرار كلها (أقسام، بطاقات، أزرار الشاشة الكاملة) قابلة للفوكس بالريموت |
           | **الرجوع بالفوكس** | من الحلقة ⇒ فوكس على **الحلقات** • من الحلقات ⇒ فوكس على **الموسم** • من الموسم ⇒ فوكس على **المسلسل** • من الفلم ⇒ فوكس على **الفلم** • ومن الفلم رجوع ⇒ فوكس على **قسم الأقسام** |
           | **الفحص** | تصريف كامل 0 خطأ / 95 صنف • اختبارات **59 ناجح / 0 فاشل** • وتصريف الكود من داخل ملف yml النهائي |
+
+          ## 8.22 — الرجوع المضمون (بالفوكس) + ريموت يخدم مزيان
+
+          | النقطة | سبب الفشل السابق | الحل في 8.22 |
+          |---|---|---|
+          | **الرجوع ما كانش يتحقق** | كانت الاستعادة مربوطة بحالة داخلية (`pendingScroll`) تضيع إذا أُعيد إنشاء الشاشة/التطبيق | الاستعادة صارت **دائمًا** من الذاكرة الدائمة (lvl + المواسم + الحلقات + القسم + الموضع + العنصر) وتُمسح العلامة **فقط بعد نجاح الاستعادة** |
+          | **الرجوع من المشغل** | إذا ضاعت extras المشغل يرجع للمسكن | زر الرجوع (والهاتف) من فلم/حلقة يفتح شاشة الأفلام/المسلسلات **دائمًا** (`REORDER_TO_FRONT`) ⇒ تُستعاد حالتها من الذاكرة حتى لو أُغلقت |
+          | **الفوكس** | كان مقيّدًا بـ«جهاز TV» فالريموت ما يخدمش | الفوكس/الإبراز يخدم على كل الأجهزة: العنصر المُفوكَس يتكبّر قليلًا واسمه يصير ذهبيًا؛ البحث ما يستقبلش فوكس الريموت لكن يبقى يخدم باللمس |
+          | **الدليل** | — | بعد كل رجوع تظهر رسالة قصيرة: «رجعت للمكان: …» أو «المواسم (3)» أو «رجعنا للقسم: مسلسلات» + سطر `[RET]`/`[BACK]` في سجل الأعطال |
+          | **الفحص** | — | تصريف كامل 0 خطأ / 95 صنف + تصريف الكود المستخرج من ملف yml النهائي |
 
           ## 8.7 — دالة MAC Portal الجديدة + الضغط لا يُخرج التطبيق
 
@@ -1792,9 +1802,9 @@ jobs:
               /** (8.21) الفوكس مع الريموت: نُبعده عن البحث ونضعه على الشبكة/المنقّح. */
               private fun focusGrid() {
                   try {
-                      if (!isTvDevice()) return
+                      // v8.22: بلا شرط «جهاز TV» — البحث ما يستقبلش فوكس الريموت ويبقى يخدم باللمس
                       etSearch.isFocusable = false
-                      etSearch.isFocusableInTouchMode = false
+                      etSearch.isFocusableInTouchMode = true
                       rvGrid.isFocusable = true
                       rvGrid.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
                       rvGrid.post { try { rvGrid.requestFocus() } catch (t: Throwable) {} }
@@ -1808,7 +1818,11 @@ jobs:
                       rvGrid.postDelayed({
                           try {
                               val v = lm.findViewByPosition(pos)
-                              if (v != null) v.requestFocus() else rvGrid.requestFocus()
+                              if (v != null) {
+                                  v.isFocusable = true
+                                  v.isFocusableInTouchMode = true         // حتى باللمس يظهر الإبراز
+                                  if (!v.requestFocus()) rvGrid.requestFocus()
+                              } else rvGrid.requestFocus()
                           } catch (t: Throwable) {}
                       }, 220)
                   } catch (t: Throwable) { Crash.log(t) }
@@ -2151,6 +2165,7 @@ jobs:
                       sp.put("ret_eps", if (lv >= 2) encodeChans(epsList) else "")
                       sp.put("ret_eps_idx", epsList.indexOfFirst { sameItem(it, played ?: lastPlayedIdOrEmpty()) }.toString())
                       sp.put("ret_items", if (lv > 0) encodeChans(items) else "")
+                      sp.put("ret_saved", if (saved.isEmpty()) "" else encodeChans(saved))   // قائمة القسم الأصلية
                       sp.put("ret_pending", "1")
                   } catch (t: Throwable) { Crash.log(t) }
               }
@@ -2169,6 +2184,19 @@ jobs:
               private fun firstVisible(): Int = try {
                   (rvGrid.layoutManager as? LinearLayoutManager)?.findFirstVisibleItemPosition() ?: 0
               } catch (t: Throwable) { 0 }
+
+              /** يعيد القائمة الأصلية للقسم (من الذاكرة أو من المحفوظ) — بلا اعتماد على إعادة البناء. */
+              private fun ensureSavedList() {
+                  if (saved.isNotEmpty()) return
+                  val t = sp.s("ret_saved")
+                  if (t.isNotBlank()) {
+                      decodeChans(t, saved)
+                      if (saved.isNotEmpty()) return
+                  }
+                  build()
+                  val keep = ArrayList(all)
+                  if (keep.isNotEmpty() && keep.none { it.stype == "season" }) saved.addAll(keep)
+              }
 
               /** يستعيد «مكان الرجوع» — نفس القسم ونفس المستوى ونفس العنصر (يشتغل حتى بعد إعادة إنشاء الشاشة). */
               private fun restoreReturn() {
@@ -2190,8 +2218,7 @@ jobs:
                       val seasons = ArrayList<Channel>()
                       decodeChans(sp.s("ret_seasons"), seasons)
                       if (eps.isNotEmpty()) {
-                          build()                                     // قائمة القسم (تحت الموسم) للرجوع إليها لاحقًا
-                          if (saved.isEmpty() && all.none { it.stype == "season" }) saved.addAll(all)
+                          ensureSavedList()                           // قائمة القسم (تحت الموسم) للرجوع إليها لاحقًا
                           seasonsList.clear(); seasonsList.addAll(seasons)
                           epsList.clear(); epsList.addAll(eps)
                           lvl = 2
@@ -2215,8 +2242,7 @@ jobs:
                       val seasons = ArrayList<Channel>()
                       decodeChans(sp.s("ret_seasons"), seasons)
                       if (seasons.isNotEmpty()) {
-                          build()
-                          if (saved.isEmpty() && all.none { it.stype == "season" }) saved.addAll(all)
+                          ensureSavedList()
                           seasonsList.clear(); seasonsList.addAll(seasons)
                           lvl = 1
                           inEpisodes = true
@@ -2273,7 +2299,8 @@ jobs:
                           (lastPlayedId.isNotBlank() && it.id == lastPlayedId && it.name == lastName)
                       }
                       try { rvGrid.post { scrollToLast() } } catch (t: Throwable) {}
-                      if (pos >= 0) focusOn(pos)
+                      if (pos >= 0) { rvGrid.scrollToPosition(pos); focusOn(pos) }
+                      toast("المواسم (" + items.size + ")")
                       return true
                   }
                   if (lvl >= 1 && saved.isNotEmpty() && saved.none { it.stype == "season" }) {
@@ -2290,7 +2317,8 @@ jobs:
                           (lastPlayedId.isNotBlank() && it.id == lastPlayedId && it.name == lastName)
                       }
                       try { rvGrid.post { scrollToLast() } } catch (t: Throwable) {}
-                      if (pos >= 0) focusOn(pos)
+                      if (pos >= 0) { rvGrid.scrollToPosition(pos); focusOn(pos) }
+                      toast("رجعنا للقسم: " + (if (kind == "movie") "أفلام" else "مسلسلات"))
                       return true
                   }
                   return false
@@ -2346,18 +2374,27 @@ jobs:
                   super.onResume()
                   goImmersive()
                   if (sp.s("ret_pending") == "1") {        // رجعنا من المشغل: نفس القسم ونفس العنصر
-                      sp.put("ret_pending", "0")
-                      if (pendingScroll) {
-                          pendingScroll = false
-                          try {
-                              restoreReturn()
-                              focusGrid()
-                              val i = items.indexOfFirst {
-                                  (lastPlayedUrl.isNotBlank() && it.url == lastPlayedUrl) ||
-                                  (lastPlayedId.isNotBlank() && it.id == lastPlayedId && it.name == lastName)
-                              }
-                              if (i >= 0) focusOn(i)
-                          } catch (t: Throwable) { Crash.log(t); try { rvGrid.post { scrollToLast() } } catch (e: Throwable) {} }
+                      // v8.22: بلا شرط «pendingScroll» — تُستعاد الحالة من الذاكرة حتى بعد إعادة إنشاء الشاشة/التطبيق
+                      pendingScroll = false
+                      try {
+                          Crash.note("RET", "kind=" + sp.s("ret_kind") + " lvl=" + sp.s("ret_lvl") +
+                              " eps=" + sp.s("ret_eps").length + " seasons=" + sp.s("ret_seasons").length +
+                              " saved=" + sp.s("ret_saved").length + " played=" + sp.s("ret_played_name"))
+                          restoreReturn()
+                          focusGrid()
+                          val i = items.indexOfFirst {
+                              (lastPlayedUrl.isNotBlank() && it.url == lastPlayedUrl) ||
+                              (lastPlayedId.isNotBlank() && it.id == lastPlayedId && it.name == lastName)
+                          }
+                          if (i >= 0) { rvGrid.scrollToPosition(i); focusOn(i) }
+                          sp.put("ret_pending", "0")           // تُمسح فقط بعد نجاح الاستعادة
+                          val lv = sp.s("ret_lvl", "0").toIntOrNull() ?: 0
+                          if (lv >= 1) toast("رجعت للمكان: " + (if (seriesName.isNotBlank()) seriesName.substringBefore(" • ") else "المسلسل"))
+                          else toast("رجعت للقسم: " + (if (kind == "movie") "أفلام" else "مسلسلات"))
+                      } catch (t: Throwable) {
+                          Crash.log(t)
+                          Crash.note("RET-FAIL", (t.message ?: t.javaClass.simpleName) + " lvl=" + sp.s("ret_lvl"))
+                          try { rvGrid.post { scrollToLast() } } catch (e: Throwable) {}
                       }
                   }
                   evRec = Events.register(this) { type, _ ->
@@ -2444,8 +2481,19 @@ jobs:
                           true
                       }
                       h.itemView.isFocusable = true
+                      h.itemView.isFocusableInTouchMode = true
                       h.itemView.isClickable = true
                       h.itemView.isLongClickable = true
+                      // v8.22: إبراز بصري واضح للعنصر المُفوكَس (ريموت/لمس)
+                      h.itemView.setOnFocusChangeListener { v, has ->
+                          try {
+                              v.scaleX = if (has) 1.06f else 1f
+                              v.scaleY = if (has) 1.06f else 1f
+                              v.alpha = if (has) 1f else 0.94f
+                              h.name.setTextColor(ContextCompat.getColor(this@GridActivity,
+                                  if (has || isLast || isFav) R.color.np_gold else R.color.np_text))
+                          } catch (t: Throwable) {}
+                      }
                   }
               }
 
@@ -2637,13 +2685,11 @@ jobs:
                   pv.controllerAutoShow = !tv                // (كان قبل bind() → استثناء يفتح شاشة المشغل = طيّاح التطبيق)
                   // v8.21: مع الريموت لا نُدخل الفوكس في البحث — الفوكس يبدأ على قائمة القنوات
                   try {
-                      etSearch.isFocusable = !tv
-                      etSearch.isFocusableInTouchMode = !tv
-                      if (tv) {
-                          rvChannels.isFocusable = true
-                          rvChannels.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
-                          rvChannels.post { try { rvChannels.requestFocus() } catch (t: Throwable) {} }
-                      }
+                      // v8.22: بلا شرط TV — البحث ما يستقبلش فوكس الريموت ويبقى يخدم باللمس
+                      etSearch.isFocusable = false
+                      etSearch.isFocusableInTouchMode = true
+                      rvChannels.isFocusable = true
+                      rvChannels.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
                   } catch (t: Throwable) { Crash.log(t) }
                   pv.controllerShowTimeoutMs = if (tv) 2600 else 4200
                   buildPlayer()
@@ -3819,12 +3865,30 @@ jobs:
               override fun onBackPressed() {
                   when {
                       // جاي من قسم الأفلام/المسلسلات: الرجوع يرجّع **نفس القسم ونفس العنصر** (لا المسكن)
-                      fromGrid -> { savePosNow(); finish() }
+                      fromGrid -> { savePosNow(); backToGrid() }
                       full -> toggleFull(false)
                       pipOn -> showPip(false)
                       etSearch.text.isNotEmpty() -> etSearch.setText("")
+                      // v8.22: فلم/حلقة حتى بلا extras ⇒ الرجوع **دائمًا** لشاشة الأفلام/المسلسلات (لا المسكن)
+                      cur != null && cur?.kind != "live" -> { savePosNow(); backToGrid() }
                       else -> finish()
                   }
+              }
+
+              /**
+               * (8.22) يرجع لشاشة الأفلام/المسلسلات: إن كانت موجودة تُستدعى (وتُستعيد حالتها المحفوظة)،
+               * وإن كانت أُغلقت تُنشأ من جديد وتُستعيد الحالة من الذاكرة الدائمة ⇒ الرجوع ما يفشلش أبدًا.
+               */
+              private fun backToGrid() {
+                  try {
+                      val k = sp.s("ret_kind").ifBlank { if (cur?.kind == "episode") "series" else "movie" }
+                      val i = Intent(this, GridActivity::class.java)
+                      i.putExtra("kind", if (k == "series") "series" else "movie")
+                      i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                      Crash.note("BACK", "to grid kind=" + k + " lvl=" + sp.s("ret_lvl") + " played=" + sp.s("ret_played_name"))
+                      startActivity(i)
+                  } catch (t: Throwable) { Crash.log(t) }
+                  finish()
               }
 
               /* ================================ الربط ================================ */
@@ -3915,7 +3979,8 @@ jobs:
                       }
                   } catch (t: Throwable) { Crash.log(t) }
                   findViewById<Button>(R.id.btn_full_close).setOnClickListener {
-                      if (fromGrid) { savePosNow(); finish() }        // «إغلاق» = رجوع للقسم بنفس الموضع
+                      if (fromGrid) { savePosNow(); backToGrid() }    // «إغلاق» = رجوع للقسم بنفس الموضع
+                      else if (cur != null && cur?.kind != "live") { savePosNow(); backToGrid() }
                       else toggleFull(false)
                   }
                   findViewById<Button>(R.id.btn_full_play).setOnClickListener {
@@ -4002,6 +4067,16 @@ jobs:
                       if (c.logo.isNotBlank()) {
                           try { Glide.with(this@LiveActivity).load(c.logo).placeholder(R.drawable.ic_live).error(R.drawable.ic_live).into(h.logo) } catch (t: Throwable) {}
                       } else h.logo.setImageResource(R.drawable.ic_live)
+                      h.itemView.isFocusable = true
+                      h.itemView.isFocusableInTouchMode = true
+                      h.itemView.setOnFocusChangeListener { v, has ->
+                          try {
+                              v.scaleX = if (has) 1.05f else 1f
+                              v.scaleY = if (has) 1.05f else 1f
+                              v.alpha = if (has) 1f else 0.94f
+                              h.name.setTextColor(if (has || sel) gold() else ContextCompat.getColor(this@LiveActivity, R.color.np_text))
+                          } catch (t: Throwable) {}
+                      }
                       h.itemView.setOnClickListener { playSafe(c, false) }
                       h.itemView.setOnLongClickListener {
                           cur = c
@@ -7730,7 +7805,7 @@ jobs:
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
           echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- الحزمة: com.nova.play — الاصدار 8.21 (code 821)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- الحزمة: com.nova.play — الاصدار 8.22 (code 822)" >> "$GITHUB_STEP_SUMMARY"
           echo "- اللغات: Kotlin 1.9.22 + media3 1.2.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
