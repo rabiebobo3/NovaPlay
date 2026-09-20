@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.27"
-      VERSION_CODE: "827"
+      VERSION_NAME: "8.28"
+      VERSION_CODE: "828"
     steps:
     - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                 minSdk 21
                 targetSdk 34
                 // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-                versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 827)
-                versionName (System.getenv("VERSION_NAME") ?: "8.27")
+                versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 828)
+                versionName (System.getenv("VERSION_NAME") ?: "8.28")
                 vectorDrawables.useSupportLibrary = true
             }
 
@@ -187,6 +187,7 @@ jobs:
             implementation 'androidx.media3:media3-exoplayer-smoothstreaming:1.4.1'
             implementation 'androidx.media3:media3-exoplayer-rtsp:1.4.1'
             implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
+            implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
             implementation 'androidx.media3:media3-ui:1.4.1'
             implementation 'androidx.mediarouter:mediarouter:1.6.0'
             implementation 'com.github.bumptech.glide:glide:4.16.0'
@@ -213,35 +214,24 @@ jobs:
         cat <<'NP_EOF' > README.md
         # NovaPlay — مشغّل IPTV بلغة Kotlin (الحزمة `com.nova.play`)
 
-        **الإصدار 8.27 (code 827)** — مشغّل media3 1.4.1 + RTMP داخل التطبيق + ضد التجمّد في المباشر.
+        **الإصدار 8.28 (code 828)** — إصلاح «لا تضهر الأقسام والقنوات» + عطب المشغّل + media3 1.4.1.
 
-        ## البناء من هنا
-        1. حطّ هذا الملف في مستودعك (أو سمّه `blank.yml`) ثم **Commit**.
-        2. تبويب **Actions** ⇒ آخر تشغيل ⇒ **Artifacts**: `app-debug.apk` / `app-release.apk`.
-        3. إذا رفض المحرّر الملف: **Add file → Upload files**.
+        ## كيفاش تبني وتجرّب
+        ارفع الملف إلى مستودعك (**Add file → Upload files**، أو سمّه `blank.yml`) ⇒ **Commit** ⇒ تبويب **Actions** ⇒ آخر تشغيل ⇒ **Artifacts** ⇒ `app-debug.apk`.
+        بعد التثبيت: **الإعدادات لازم الرقم 8.28** ⇒ أضف سيرفراتك يدويًا ⇒ «إعادة تحميل البوابة» مرّة.
+        أي عطل: الإعدادات ⇒ **سجل الأعطال** ⇒ «مشاركة/نسخ».
 
-        ## بعد التثبيت — أوّل خطوة
-        **الإعدادات: لازم الرقم 8.27** (لو ظهر أقدم ⇒ النسخة قديمة، أعد التحميل).
-        ثم: أضف سيرفراتك يدويًا (M3U / Xtream / MAC Portal) ⇒ «إعادة تحميل البوابة» مرّة واحدة.
-        أي عطل: الإعدادات ⇒ **سجل الأعطال** ⇒ «مشاركة/نسخ» (`RET` / `CAT-CACHE` / `LIVE-STALL` / `PLAY-FAIL`).
+        ## الجديد في 8.28 (إصلاحات أعطال ظهرت عندك)
+        - **«عند ضغط على البث المباشر لا تضهر الأقسام والقنوات» — تُصلّحت.** السبب: عنصر إغلاق المشغّل صار `ImageView` في الجدول الجديد والكود القديم كان يقصّه `Button` ⇒ `ClassCastException` تخرج من `bind()` فتوقف الشاشة قبل تحميل الأقسام والقنوات. الآن القصّ `View`.
+        - **الشاشة ما تتوقفش بعد اليوم بسبب عنصر واحد:** كل خطوة (المشغّل، الأقسام والقنوات، الشرائط، الكاست، آخر قناة، الساعة) تُنفَّذ وحدها داخل حماية.
+        - باقي إصلاحات 8.27 موجودة: **media3 1.4.1** + **RTMP داخل التطبيق** + ضبط البث المباشر.
 
-        ## الجديد في 8.27
-        - **المشغّل مُرقّى إلى media3 1.4.1** (كانت 1.2.1): فيها إصلاحات كثيرة لثبات HLS/DASH في البث المباشر.
-        - **RTMP داخل التطبيق**: زدنا وحدة `media3-datasource-rtmp` ⇒ روابط `rtmp://` تخدم بلا مشغّل خارجي.
-        - **ضبط البث المباشر**: نبقى ~2.5 ثانية وراء حرف البث والسرعة تتحرّك بين 0.96 و 1.04 ⇒ يتدارك التأخّر لوحده بدل ما يتجمّد.
-        - **تحديد نوع الملف بدقّة**: m3u8 (HLS) • mpd (DASH) • ts/m2ts • mkv • mp4 • webm ⇒ بلا تجريب طويل.
-        - **يقرا كل الصيغ**: HLS • DASH • SmoothStreaming • RTSP • RTMP • MP4 • MKV • TS • **AVI** • **FLV** (media3 1.4.1 فيها محلّلات AVI و FLV).
-        - كل ما في 8.26 موجود: شكل المشغّل كالصورة (عجلة حمراء + «جاري تحميل» + `KB/s`)، شارة LIVE + شعار القناة، ⏮/⏭ كبيرين، وضد التجمّد (`LIVE-STALL`).
+        ## الصيغ المدعومة
+        HLS • DASH • SmoothStreaming • RTSP • **RTMP** • MP4 • MKV • TS • **AVI** • **FLV** + الترجمات.
+        **غير مدعوم:** **WMV / ASF** (كوديك غير موجود في أندرويد).
 
-        ## من 8.24/8.25/8.26 (موجودة)
-        - قناة: لمسة واحدة = مشغّل صغير • لمستان = مشغّل كبير فورًا.
-        - فلم/حلقة: لمسة واحدة = المشغّل الكبير • الرجوع يرجعك لنفس القائمة بنفس العنصر.
-        - سؤال الاستكمال: «هل تريد إكمال الفلم من الوقت الذي خرجت فيه؟».
-        - فتح الفئة: شاشة تحميل أنيقة + ذاكرة دائمة (الدخول الثاني فوري).
-
-        ## حدود صريحة
-        - **WMV / ASF**: غير مدعومة (كوديك WMV ماشي موجود في أندرويد نفسه).
-        - بعض ملفات AVI القديمة جدًا (كوديك نادر) قد تفشل — أكثريتها تخدم الآن.
+        ## من 8.26 (موجود)
+        شكل المشغّل كالصورة (عجلة حمراء + «جاري تحميل» + `KB/s` • شارة LIVE + شعار القناة) • بلا تجمّد في المباشر • قناة: لمسة = مشغّل صغير، لمستان = كبير • الرجوع للأفلام/الحلقات لنفس القائمة.
         NP_EOF
         cat <<'NP_EOF' > app/src/main/AndroidManifest.xml
         <?xml version="1.0" encoding="utf-8"?>
@@ -2528,13 +2518,19 @@ jobs:
                 }
             }
 
+            /** (8.28) ينفّذ خطوة وحدها: عطب في خطوة واحدة لا يُفقد الشاشة أقسامها وقنواتها. */
+            private fun safe(what: String, block: () -> Unit) {
+                try { block() } catch (t: Throwable) { Crash.log(t); try { toast("تعذّر: " + what) } catch (e: Throwable) {} }
+            }
+
             private fun initScreen() {
                 tv = isTvDevice()
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 window.setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC)
                 setContentView(R.layout.activity_live)
                 goImmersive()
-                bind()                                     // ← أولًا: هنا تُعيَّن pv/pvFull وباقي العناصر
+                // (8.28) أي عطب في عنصر واحد لا يمنع أبدًا تحميل الأقسام والقنوات
+                try { bind() } catch (t: Throwable) { Crash.log(t); toast("عنصر في المشغّل تعذّر ربطه — باقي الشاشة تخدم") }
                 // نسبة الصورة: «تكبير يملأ الشاشة» افتراضيًا (يملأ الهاتف بلا شدّ). ترقية مرة واحدة من 8.17
                 // (النسخة السابقة كانت تحفظ 16:9 الثابتة تلقائيًا ⇒ أشرطة سوداء على الجانبين)
                 if (sp.s("rm5", "") != "1") {
@@ -2552,17 +2548,20 @@ jobs:
                     rvChannels.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
                 } catch (t: Throwable) { Crash.log(t) }
                 pv.controllerShowTimeoutMs = if (tv) 2600 else 4200
-                buildPlayer()
-                decodeChans(sp.s("favs"), favs)
-                decodeChans(sp.s("recents"), recents)
-                loadMine()
+                // (8.28) كل خطوة مستقلة: أي عطب (مشغّل، شرائط، كاست) ما يمنعش ظهور الأقسام والقنوات
+                safe("المشغّل") { buildPlayer() }
+                safe("المفضلة") { decodeChans(sp.s("favs"), favs) }
+                safe("الأخيرة") { decodeChans(sp.s("recents"), recents) }
+                safe("قنواتي") { loadMine() }
                 autoNext = sp.b("auto_next", true)
-                buildGroups()
-                rvChannels.adapter = chanAdapter
-                rvGroups.adapter = grpAdapter
-                selectGroup(groups.firstOrNull() ?: Group().apply { name = "ALL"; special = "all" })
-                setupCast()
-                readExtraRoute()
+                safe("الأقسام والقنوات") {
+                    buildGroups()
+                    rvChannels.adapter = chanAdapter
+                    rvGroups.adapter = grpAdapter
+                    selectGroup(groups.firstOrNull() ?: Group().apply { name = "ALL"; special = "all" })
+                }
+                safe("البث للشاشة") { setupCast() }
+                safe("مسار التشغيل") { readExtraRoute() }
                 val direct = intent.getStringExtra("play")
                 val chanExtra = intent.getStringExtra("chan")
                 if (!direct.isNullOrBlank() || !chanExtra.isNullOrBlank()) {
@@ -2579,10 +2578,10 @@ jobs:
                             } else toast("تعذّر تحميل القائمة")
                         }
                     }
-                } else if (restoreLastChannel()) {
-                    // v8.24: رجعنا للشاشة ⇒ نفس القناة تُشتغل في المشغل الصغير بسلاسة + الفوكس فوقها
+                } else safe("آخر قناة") {
+                    restoreLastChannel()   // v8.24: رجعنا للشاشة ⇒ نفس القناة تُشتغل في المشغل الصغير + الفوكس فوقها
                 }
-                startTicker()
+                safe("الساعة") { startTicker() }
             }
 
             override fun onResume() {
@@ -4250,7 +4249,7 @@ jobs:
                 findViewById<Button>(R.id.btn_dock_full).setOnClickListener { toggleFull(true) }
                 try {
                     findViewById<Button>(R.id.btn_dock_full).setOnLongClickListener { cycleResize(); true }
-                    findViewById<Button>(R.id.btn_full_close).setOnLongClickListener { cycleResize(); true }
+                    findViewById<android.view.View>(R.id.btn_full_close).setOnLongClickListener { cycleResize(); true }
                 } catch (t: Throwable) {}
                 findViewById<Button>(R.id.btn_dock_fav).setOnClickListener { toggleFav() }
                 findViewById<Button>(R.id.btn_dock_catch).setOnClickListener { catchup() }
@@ -4274,7 +4273,8 @@ jobs:
                     findViewById<Button>(R.id.btn_full_txt).setOnClickListener { pickTrack(true); showBars() }
                     findViewById<Button>(R.id.btn_full_lock).setOnClickListener { if (!ctrlLocked) toggleLock() }
                     findViewById<Button>(R.id.btn_full_lock).setOnLongClickListener { if (ctrlLocked) { toggleLock(); true } else false }
-                    findViewById<TextView>(R.id.tv_full_dur).setOnClickListener { wantRemain = !wantRemain; showBars() }
+                    try {                                      // (8.28) حماية كتلة الأزرار والشرائط
+                findViewById<TextView>(R.id.tv_full_dur).setOnClickListener { wantRemain = !wantRemain; showBars() }
                     // v8.26: عناصر الشكل الجديد (الصورة): سابق/تالي كبيران + أيقونات + الاسم والشعار + السرعة
                     tvSpeed = findViewById(R.id.tv_speed)
                     chName = findViewById(R.id.ch_name)
@@ -4302,7 +4302,8 @@ jobs:
                         findViewById<View>(id)?.let { v -> v.isFocusable = true; v.isFocusableInTouchMode = true }
                     }
                 } catch (t: Throwable) { Crash.log(t) }
-                findViewById<Button>(R.id.btn_full_close).setOnClickListener {
+                // (8.28) الإصلاح: عنصر الإغلاق ImageView في الجدول الجديد — القصّ بـView يخدم في الحالتين
+                findViewById<android.view.View>(R.id.btn_full_close).setOnClickListener {
                     if (fromGrid) { savePosNow(); backToGrid() }    // «إغلاق» = رجوع للقسم بنفس الموضع
                     else if (cur != null && cur?.kind != "live") { savePosNow(); backToGrid() }
                     else toggleFull(false)
@@ -4345,6 +4346,7 @@ jobs:
                 }
                 sbDock.setOnSeekBarChangeListener(sb)
                 sbFull.setOnSeekBarChangeListener(sb)
+                } catch (t: Throwable) { Crash.log(t) }    // (8.28) نهاية الحماية
             }
 
             /* ================================ المحوّلات ================================ */
@@ -8312,7 +8314,7 @@ jobs:
         echo "" >> "$GITHUB_STEP_SUMMARY"
         echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
         echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-        echo "- الحزمة: com.nova.play — الاصدار 8.27 (code 827)" >> "$GITHUB_STEP_SUMMARY"
+        echo "- الحزمة: com.nova.play — الاصدار 8.28 (code 828)" >> "$GITHUB_STEP_SUMMARY"
         echo "- اللغات: Kotlin 1.9.22 + media3 1.4.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Upload artifacts
