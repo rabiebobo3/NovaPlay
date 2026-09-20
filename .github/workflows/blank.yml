@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.33"
-      VERSION_CODE: "833"
+      VERSION_NAME: "8.34"
+      VERSION_CODE: "834"
     steps:
     - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                minSdk 21
                targetSdk 34
                // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 833)
-               versionName (System.getenv("VERSION_NAME") ?: "8.33")
+               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 834)
+               versionName (System.getenv("VERSION_NAME") ?: "8.34")
                vectorDrawables.useSupportLibrary = true
            }
 
@@ -187,12 +187,6 @@ jobs:
            implementation 'androidx.media3:media3-exoplayer-smoothstreaming:1.4.1'
            implementation 'androidx.media3:media3-exoplayer-rtsp:1.4.1'
             implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
-            implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
-            implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
-            implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
-           implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
-           implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
-           implementation 'androidx.media3:media3-datasource-rtmp:1.4.1'
            implementation 'androidx.media3:media3-ui:1.4.1'
            implementation 'androidx.mediarouter:mediarouter:1.6.0'
            implementation 'com.github.bumptech.glide:glide:4.16.0'
@@ -219,23 +213,23 @@ jobs:
        cat <<'NP_EOF' > README.md
        # NovaPlay — مشغّل IPTV (Kotlin · `com.nova.play`)
 
-       **الإصدار 8.33 (code 833)** — إصلاح خطأ التصريف اللي وقف البناء + نفس إصلاحات 8.32 كاملة.
+       **الإصدار 8.34 (code 834)** — الأفلام والحلقات تشتغل + رجوع للقنوات صحيح + لوحة أزرار احترافية.
 
        ## البناء
        ارفع الملف (**Add file → Upload files**) ⇒ Commit ⇒ Actions ⇒ Artifacts ⇒ `app-debug.apk`.
-       بعد التثبيت: **الإعدادات لازم 8.33**.
+       بعد التثبيت: **الإعدادات لازم 8.34**.
 
-       ## واش كان سبب فشل البناء في 8.32
-       متغيّر `busyFlash` (مؤقّت ظهور عجلة التحميل) كان يقبل «بلا قيمة» (null) وتمرّره لدالة الـHandler،
-       وandroid-34 يرفض ذلك في التصريف. صُلّح بتمرير قيمة صحيحة دائمًا.
-
-       ## واش في 8.33 (مثل 8.32)
-       - **بلا تقطيع:** مخزون أكبر للمباشر (6 ثوانٍ) + هامش أوسع عن حرف البثّ + عجلة التحميل ما تظهرش على وقفة خفيفة + إصلاح ناعم قبل إعادة التشغيل.
-       - **الريموت:** الفوكس ما يروحش لصندوق البحث لحاله.
-       - **الرجوع من قناة:** يرجع للقسم اللي فيه القناة + الفوكس على القناة.
-       - **الرجوع من فلم/حلقة:** دائمًا لقائمة الأفلام/المسلسلات بنفس القسم ونفس العنصر.
-       - **المشغل:** 5 أزرار احترافية + زر «⋯» للباقي · بلا أزرار عائمة في مشغل القنوات.
-       - **ريموت المشغل:** والشريط مخفي: فوق/تحت = قناة · يمين/يسار = 10 ثوانٍ.
+       ## واش تصلّح (أسباب مُثبتة من سجل الأعطال + تجربة على البوابة)
+       - **الأفلام/الحلقات ما كانوش يشتغلوا:** كنا نبعث للبوابة أوامر غالطة (أمر فارغ، معرّف مستخرج من base64،
+         رابط البوابة نفسها، نوع itv لفلم) ⇒ البوابة ترد **رابطًا ميتًا** `stream=.` ⇒ 444/405/404.
+         صار: فلم = `type=vod` وأمر البوابة، وإن ما كانش الأمر نبنيوه من المعرّف (مُجرّب: يرجع رابطًا سليمًا)؛
+         حلقة = صيغة Java بالحرف (base64 + `series=<رقم الحلقة>`)، وكل رابط ميت يُرفض قبل التشغيل.
+       - **«يذهب للحلقة ولا يدخل القنوات»:** كان يُحفظ «آخر عنصر» حتى للأفلام/الحلقات. صار الحفظ للقنوات فقط،
+         وزر «البث المباشر» يفتح وضع القنوات صراحةً.
+       - **الفوكس مع الريموت:** الفوكس يُوضع على القناة/القائمة عند الفتح وبعد اختيار قسم، وما يروحش للبحث أبدًا.
+       - **شكل الأزرار في المشغل الكبير:** لوحة دائرية أنيقة (Vector) — السابق، -10، **تشغيل/إيقاف في الوسط**،
+         +10، التالي، و«⋯» للباقي — وكل زر يتوهّج بحدّ ذهبي لمّا يوصل إليه الريموت.
+       - **بلا أسهم عائمة** على الصورة في مشغل القنوات.
 
        ## سجل الأعطال
        `PLAY-URL` الرابط · `PLAY-FAIL` رمز الخطأ · `PLAY-FIX` إصلاح ذاتي · `LIVE-STALL` إصلاح الوقفة.
@@ -2601,12 +2595,17 @@ jobs:
                  busy(false, "")
                  if (ok) {
                    buildGroups(); selectGroup(groups.firstOrNull()!!)
-                   restoreLastChannel()          // v8.24: بعد تحميل القائمة — آخر قناة ترجع في المشغل الصغير
+                   // v8.24 + (8.34): أمر «وضع القنوات» أهمّ من استعادة آخر قناة
+                   if (intent?.getStringExtra("mode") == "live") focusChannelList()
+                   else restoreLastChannel()
                  } else toast("تعذّر تحميل القائمة")
                }
              }
            } else safe("آخر قناة") {
-             restoreLastChannel()   // v8.24: رجعنا للشاشة ⇒ نفس القناة تُشتغل في المشغل الصغير + الفوكس فوقها
+             // v8.24 + (8.34): آخر قناة (مباشر فقط) تُشتغل في المشغل الصغير — وإلا نُظهر القنوات والفوكس عليها
+             // (8.34) ولو جاي من زر «البث المباشر» نعرض القنوات مباشرةً بلا تشغيل تلقائي
+             if (intent?.getStringExtra("mode") == "live") focusChannelList()
+             else if (!restoreLastChannel()) focusChannelList()
            }
            safe("الساعة") { startTicker() }
          }
@@ -2659,7 +2658,50 @@ jobs:
            if (!direct.isNullOrBlank() || !chanExtra.isNullOrBlank()) {
              showPip(false)
              playSafe(chanFromIntent(direct ?: ""), true)
+             return
            }
+           // (8.34) رجعنا للشاشة من زر «البث المباشر» ⇒ نعرض القنوات (لا نبقى على فلم/حلقة)
+           if (i?.getStringExtra("mode") == "live") enterLiveMode()
+         }
+
+         /**
+         * (8.34) وضع القنوات: نُفرّغ مسار الفلم/الحلقة ونضع الفوكس على قائمة القنوات.
+         * كانت المشكلة: بعد الخروج من التطبيق والدخول من جديد، تبقى الحلقة/الفلم معروضة
+         * ولا «تدخل» شاشة القنوات.
+         */
+         private fun enterLiveMode() {
+           try {
+             fromGrid = false
+             plist.clear()
+             if (cur != null && cur?.kind != "live") {
+               stopAllPlayback()
+               cur = null
+               try {
+                 infoName.text = "NovaPlay"
+                 infoSub.text = "اختر قناة من القائمة"
+                 infoDesc.text = ""
+               } catch (t: Throwable) {}
+               showPip(false)
+             }
+             refresh()
+             focusChannelList()
+           } catch (t: Throwable) { Crash.log(t) }
+         }
+
+         /** (8.34) الفوكس على قائمة القنوات — تُستعمل عند الفتح/الرجوع لكي لا يذهب الفوكس للبحث أو للفراغ. */
+         private fun focusChannelList() {
+           try {
+             val g = curGroup
+             if (g.isNotBlank()) {
+               val hit = groups.firstOrNull { it.name == g }
+               if (hit != null && !groups.isEmpty() && shown.isEmpty()) selectGroup(hit)
+             }
+             rvChannels.isFocusable = true
+             rvChannels.descendantFocusability = android.view.ViewGroup.FOCUS_AFTER_DESCENDANTS
+             rvChannels.postDelayed({
+               try { rvChannels.requestFocus() } catch (t: Throwable) {}
+             }, 120)
+           } catch (t: Throwable) { Crash.log(t) }
          }
 
          override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -2704,6 +2746,8 @@ jobs:
              if (cur != null) return false                        // شيء يعمل الآن
              val c = Channel.fromJson(JSONObject(raw))
              if (c.name.isBlank()) return false
+             if (c.kind != "live") return false                 // (8.34) لا نُشغّل فلمًا/حلقة في شاشة القنوات
+             if (!Catalog.loaded || Catalog.live.isEmpty()) return false
              selectGroupOf(c)
              playSafe(c, false)
              true
@@ -2816,7 +2860,9 @@ jobs:
            queries.clear(); candIdx = 0            // لا تبقى أوامر عنصر سابق (كانت تُشغّل قناة غلط)
            tuneLoad(c)
            applySkin()                                                       // v8.26: شكل المشغّل حسب المحتوى
-           try { sp.put("last_ch", c.toJson().toString()) } catch (t: Throwable) {}   // آخر قناة (للرجوع)
+           // (8.34) نحفظ «آخر قناة» للمباشر فقط: كان يُحفظ فلم/حلقة ⇒ عند فتح شاشة القنوات
+           //        تُشغَّل الحلقة تلقائيًا بدل عرض القنوات (شكوى: «يذهب للحلقة ولا يدخل القنوات»)
+           if (c.kind == "live") try { sp.put("last_ch", c.toJson().toString()) } catch (t: Throwable) {}
            pushRecent(c)
            var url = c.url.ifBlank { c.alt }
            val p = Catalog.profile
@@ -2876,7 +2922,8 @@ jobs:
              busy(false, "")
              val info = try { StalkerSession.get(p).lastEpsInfo } catch (t: Throwable) { "" }
              if (info.isNotBlank()) Crash.note("PLAY-FAIL-ALL", "kind=${c.kind} mid=${c.mid} sid=${c.sid} snum=${c.snum} ep=${c.id} :: " + info.take(400))
-             showPlayerError("فشلت كل محاولات التشغيل (${queries.size}) لهذا العنصر\n" + Catalog.status.take(140))
+             showPlayerError("تعذّر جلب رابط تشغيل من البوابة لهذا العنصر (${queries.size} محاولة)\n" +
+               "جرّب عنصرًا آخر أو حدّث القائمة من الإعدادات.\n" + Catalog.status.take(120))
              return
            }
            val q = queries[candIdx]
@@ -3056,7 +3103,8 @@ jobs:
              try { pvFull.requestLayout() } catch (t: Throwable) {}
              pvFull.useController = false
              fullTitle.text = cur?.name ?: ""
-             findViewById<View>(R.id.fullBar)?.requestFocus()
+             // (8.34) الفوكس على زر التشغيل مباشرة (أوضح للريموت)
+             findViewById<View>(R.id.btn_full_play)?.requestFocus()
              hideBarsSoon()
            } else {
              fullBox.visibility = View.GONE
@@ -3147,6 +3195,10 @@ jobs:
          private fun updateCenterPlay() {
            try {
              findViewById<TextView>(R.id.btn_center_play).text = if (player?.isPlaying == true) "⏸" else "▶"
+             // (8.34) أيقونة زر التشغيل في لوحة الأزرار (ImageButton) — تتبدّل مع حالة المشغّل
+             (findViewById<View>(R.id.btn_full_play) as? android.widget.ImageButton)?.let { b ->
+               b.setImageResource(if (player?.isPlaying == true) R.drawable.ic_pause else R.drawable.ic_play)
+             }
            } catch (t: Throwable) {}
          }
 
@@ -3243,11 +3295,12 @@ jobs:
            try {
              val live = (cur?.kind ?: "live") == "live"
              isLive = live
-             vis(R.id.btn_prev_big, live)
-             vis(R.id.btn_next_big, live)
+             // (8.34) بلا أسهم عائمة على الصورة: التنقّل صار من لوحة الأزرار السفلية
              vis(R.id.liveBadge, live)
              vis(R.id.fullSeekRow, !live)
-             vis(R.id.fullBtnRow, !live)
+             vis(R.id.fullBtnRow, true)
+             vis(R.id.btn_full_back10, !live)
+             vis(R.id.btn_full_fwd10, !live)
              vis(R.id.btn_full_more, true)
              vis(R.id.btn_center_play, false)
              vis(R.id.ch_name, true)
@@ -3490,10 +3543,7 @@ jobs:
          private fun fadeBars(show: Boolean) {
            val bar = try { findViewById<View>(R.id.fullBar) } catch (t: Throwable) { null }
            val top = topBar
-           // (8.32) سهمَا تبديل القناة يختفيان مع الشرائط ⇒ صورة نظيفة بلا أزرار عائمة في مشغل القنوات
-           val a1 = if (isLive) try { findViewById<View>(R.id.btn_prev_big) } catch (t: Throwable) { null } else null
-           val a2 = if (isLive) try { findViewById<View>(R.id.btn_next_big) } catch (t: Throwable) { null } else null
-           for (v in listOfNotNull(bar, top, a1, a2)) {
+           for (v in listOfNotNull(bar, top)) {
              try {
                if (show) {
                  v.visibility = View.VISIBLE
@@ -3927,6 +3977,8 @@ jobs:
            tvGroupTitle.text = g.name
            refresh()
            grpAdapter.notifyDataSetChanged()
+           // (8.34) الفوكس ينتقل إلى قائمة القنوات — وإلا يبقى ضايعًا على الأقسام
+           rvChannels.postDelayed({ try { rvChannels.requestFocus() } catch (t: Throwable) {} }, 90)
          }
 
          private fun refresh() {
@@ -4458,18 +4510,25 @@ jobs:
                if (ctrlLocked) toast("الأزرار مقفلة — ضغطة مطوّلة على القفل لفكّها") else { togglePlay(); showBars() }
              }
              cplay.setOnLongClickListener { if (ctrlLocked) { toggleLock(); true } else false }
-             findViewById<Button>(R.id.btn_full_back10).setOnClickListener { skip(-10_000); showBars() }
-             findViewById<Button>(R.id.btn_full_fwd10).setOnClickListener { skip(10_000); showBars() }
-             // (8.32) الأزرار الثانوية ما بقاتش على الشاشة — تندار في نافذة «⋯» (أنظف وأسهل بالريموت)
+             // (8.34) الصف الجديد: أزرار دائرية بأيقونات متّجهة (ImageButton) — لا نصبّها كـButton
+             findViewById<View>(R.id.btn_full_back10).setOnClickListener { skip(-10_000); showBars() }
+             findViewById<View>(R.id.btn_full_fwd10).setOnClickListener { skip(10_000); showBars() }
              findViewById<View>(R.id.btn_full_more)?.setOnClickListener { moreDialog() }
+             // لمّا يوصل الفوكس لزر، نُظهر الشرائط (ريموت) حتى ما يضيعش المستخدم
+             for (id in listOf(R.id.btn_full_prev, R.id.btn_full_back10, R.id.btn_full_play,
+               R.id.btn_full_fwd10, R.id.btn_full_next, R.id.btn_full_more)) {
+               try {
+                 findViewById<View>(id)?.setOnFocusChangeListener { _, has ->
+                   if (has) { try { showBars() } catch (t: Throwable) {} }
+                 }
+               } catch (t: Throwable) {}
+             }
              try {                                      // (8.28) حماية كتلة الأزرار والشرائط
            findViewById<TextView>(R.id.tv_full_dur).setOnClickListener { wantRemain = !wantRemain; showBars() }
              // v8.26: عناصر الشكل الجديد (الصورة): سابق/تالي كبيران + أيقونات + الاسم والشعار + السرعة
              tvSpeed = findViewById(R.id.tv_speed)
              chName = findViewById(R.id.ch_name)
              chLogo = findViewById(R.id.ch_logo)
-             findViewById<ImageView>(R.id.btn_prev_big).setOnClickListener { prev(); showBars() }
-             findViewById<ImageView>(R.id.btn_next_big).setOnClickListener { next(false); showBars() }
              findViewById<ImageView>(R.id.btn_layers).setOnClickListener { sourcesDialog() }
              findViewById<ImageView>(R.id.btn_pfav).setOnClickListener { favCurrent() }
              findViewById<ImageView>(R.id.btn_fit).setOnClickListener { cycleResize(); showBars() }
@@ -4497,13 +4556,13 @@ jobs:
              else if (cur != null && cur?.kind != "live") { savePosNow(); backToGrid() }
              else toggleFull(false)
            }
-           findViewById<Button>(R.id.btn_full_play).setOnClickListener {
+           findViewById<View>(R.id.btn_full_play).setOnClickListener {
              val p = player ?: return@setOnClickListener
              if (p.isPlaying) p.pause() else p.play()
              showBars()
            }
-           findViewById<Button>(R.id.btn_full_prev).setOnClickListener { prev(); showBars() }
-           findViewById<Button>(R.id.btn_full_next).setOnClickListener { next(false); showBars() }
+           findViewById<View>(R.id.btn_full_prev).setOnClickListener { prev(); showBars() }
+           findViewById<View>(R.id.btn_full_next).setOnClickListener { next(false); showBars() }
            findViewById<Button>(R.id.btn_full_pip).setOnClickListener { showPip(!pipOn); toggleFull(false) }
            findViewById<Button>(R.id.btn_full_cast).setOnClickListener {
              try { if (!castBtn.showDialog()) toast("لا توجد أجهزة متاحة — شغّل وضع البث في الجهاز") } catch (t: Throwable) { toast("البث غير مدعوم هنا") }
@@ -4673,541 +4732,545 @@ jobs:
        import java.util.UUID
 
        /**
-        * الشاشة الأولى: بوابة الدخول (سحابية أو محلية) + إعداد السيرفر + لوحة البيت.
-        */
+       * الشاشة الأولى: بوابة الدخول (سحابية أو محلية) + إعداد السيرفر + لوحة البيت.
+       */
        class MainActivity : AppCompatActivity() {
 
-           private var sess = ""
-           private var box = ""                 // gate | login | server | home
-           private val h = Handler(Looper.getMainLooper())
-           private var loadTimeout: Runnable? = null
-           private var receiver: android.content.BroadcastReceiver? = null
-           private var sessionListener: com.google.firebase.database.ValueEventListener? = null
-           private var dlgProgress: AlertDialog? = null
-           private var bar: ProgressBar? = null
-           private var barTxt: TextView? = null
+         private var sess = ""
+         private var box = ""                 // gate | login | server | home
+         private val h = Handler(Looper.getMainLooper())
+         private var loadTimeout: Runnable? = null
+         private var receiver: android.content.BroadcastReceiver? = null
+         private var sessionListener: com.google.firebase.database.ValueEventListener? = null
+         private var dlgProgress: AlertDialog? = null
+         private var bar: ProgressBar? = null
+         private var barTxt: TextView? = null
 
-           private lateinit var gateBox: View
-           private lateinit var loginBox: View
-           private lateinit var serverBox: View
-           private lateinit var homeBox: LinearLayout
-           private lateinit var busyBox: LinearLayout
-           private lateinit var wdBar: LinearLayout
-           private lateinit var tvBusy: TextView
-           private lateinit var tvVer: TextView
-           private lateinit var homeExp: TextView
-           private lateinit var tvHomeStatus: TextView
-           private lateinit var tvLiveCount: TextView
-           private lateinit var tvLoginStatus: TextView
-           private lateinit var tvServerStatus: TextView
-           private lateinit var spType: Spinner
-           private lateinit var etName: EditText
-           private lateinit var etUrl: EditText
-           private lateinit var etUser: EditText
-           private lateinit var etPass: EditText
-           private lateinit var etMac: EditText
-           private lateinit var etLUser: EditText
-           private lateinit var etLPass: EditText
-           private var autoLogin = false
+         private lateinit var gateBox: View
+         private lateinit var loginBox: View
+         private lateinit var serverBox: View
+         private lateinit var homeBox: LinearLayout
+         private lateinit var busyBox: LinearLayout
+         private lateinit var wdBar: LinearLayout
+         private lateinit var tvBusy: TextView
+         private lateinit var tvVer: TextView
+         private lateinit var homeExp: TextView
+         private lateinit var tvHomeStatus: TextView
+         private lateinit var tvLiveCount: TextView
+         private lateinit var tvLoginStatus: TextView
+         private lateinit var tvServerStatus: TextView
+         private lateinit var spType: Spinner
+         private lateinit var etName: EditText
+         private lateinit var etUrl: EditText
+         private lateinit var etUser: EditText
+         private lateinit var etPass: EditText
+         private lateinit var etMac: EditText
+         private lateinit var etLUser: EditText
+         private lateinit var etLPass: EditText
+         private var autoLogin = false
 
-           override fun onCreate(savedInstanceState: Bundle?) {
-               super.onCreate(savedInstanceState)
-               window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-               setContentView(R.layout.activity_main)
-               goImmersive()
-               bind()
-               ensureSession()
-               askNotifPermission()
-               Remote.init(this)
-               if (sp.s("theme", "night") == "day") (getApplication() as NovaApp).applyTheme()
+         override fun onCreate(savedInstanceState: Bundle?) {
+           super.onCreate(savedInstanceState)
+           window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+           setContentView(R.layout.activity_main)
+           goImmersive()
+           bind()
+           ensureSession()
+           askNotifPermission()
+           Remote.init(this)
+           if (sp.s("theme", "night") == "day") (getApplication() as NovaApp).applyTheme()
 
-               val p = currentProfile()
-               val logged = sp.s("auth_user").isNotEmpty()
-               when {
-                   p == null -> show("server")
-                   !logged && Remote.ready() -> show("gate")
-                   else -> startLoad(false)
-               }
+           val p = currentProfile()
+           val logged = sp.s("auth_user").isNotEmpty()
+           when {
+             p == null -> show("server")
+             !logged && Remote.ready() -> show("gate")
+             else -> startLoad(false)
+           }
+         }
+
+         override fun onWindowFocusChanged(hasFocus: Boolean) {
+           super.onWindowFocusChanged(hasFocus)
+           if (hasFocus) goImmersive()
+         }
+
+         override fun onResume() {
+           super.onResume()
+           goImmersive()
+           receiver = Events.register(this) { type, text ->
+             when (type) {
+               "broadcast" -> if (text.isNotEmpty()) infoDialog("إشعار من السيرفر", text)
+               "update" -> offerUpdate(text.toLongOrNull() ?: 0)
+               "kicked" -> forceLogout(text)
+               "logout" -> show("gate")
+               "reload" -> { currentProfile()?.let { startLoad(true) } }
+             }
+           }
+           refreshHome()
+         }
+
+         override fun onPause() {
+           Events.unregister(this, receiver); receiver = null
+           h.removeCallbacksAndMessages(null)
+           super.onPause()
+         }
+
+         override fun onDestroy() {
+           Remote.stop(this, sessionListener); sessionListener = null
+           dlgProgress?.dismiss()
+           super.onDestroy()
+         }
+
+         /* ------------------------------ الربط ------------------------------ */
+
+         private fun bind() {
+           gateBox = findViewById(R.id.gateBox)
+           loginBox = findViewById(R.id.loginBox)
+           serverBox = findViewById(R.id.serverBox)
+           homeBox = findViewById(R.id.homeBox)
+           busyBox = findViewById(R.id.busyBox)
+           wdBar = findViewById(R.id.watchdogBar)
+           tvBusy = findViewById(R.id.tv_busy)
+           tvVer = findViewById(R.id.tv_ver)
+           homeExp = findViewById(R.id.home_exp)
+           tvHomeStatus = findViewById(R.id.tv_home_status)
+           tvLiveCount = findViewById(R.id.tv_live_count)
+           tvLoginStatus = findViewById(R.id.tv_login_status)
+           tvServerStatus = findViewById(R.id.tv_server_status)
+           spType = findViewById(R.id.sp_type)
+           etName = findViewById(R.id.et_name)
+           etUrl = findViewById(R.id.et_url)
+           etUser = findViewById(R.id.et_user)
+           etPass = findViewById(R.id.et_pass)
+           etMac = findViewById(R.id.et_mac)
+           etLUser = findViewById(R.id.et_luser)
+           etLPass = findViewById(R.id.et_lpass)
+
+           tvVer.text = "الإصدار " + appVersion(this) + (if (Remote.ready()) " • سحابي" else " • محلي")
+
+           spType.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item,
+             listOf("M3U / رابط قائمة", "Xtream Codes", "MAC Portal (Stalker)"))
+             .also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+           spType.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+             override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, pos: Int, id: Long) {
+               etUser.visibility = if (pos == 1) View.VISIBLE else View.GONE
+               etPass.visibility = if (pos == 1) View.VISIBLE else View.GONE
+               etMac.visibility = if (pos == 2) View.VISIBLE else View.GONE
+             }
+
+             override fun onNothingSelected(p: android.widget.AdapterView<*>?) {}
            }
 
-           override fun onWindowFocusChanged(hasFocus: Boolean) {
-               super.onWindowFocusChanged(hasFocus)
-               if (hasFocus) goImmersive()
+           findViewById<Button>(R.id.btn_login_open).setOnClickListener { show("login"); focus(etLUser) }
+           findViewById<Button>(R.id.btn_direct).setOnClickListener {
+             sp.put("auth_user", sp.s("guest_user", "guest")); fillServerForm(); show("server")
+           }
+           findViewById<View>(R.id.btn_admin_open).setOnClickListener { openAdmin() }
+           findViewById<View>(R.id.btn_update_open).setOnClickListener { checkUpdate(true) }
+           findViewById<View>(R.id.btn_theme_toggle).setOnClickListener {
+             sp.put("theme", if (sp.s("theme", "night") == "night") "day" else "night")
+             (getApplication() as NovaApp).applyTheme()
+             recreate()
            }
 
-           override fun onResume() {
-               super.onResume()
-               goImmersive()
-               receiver = Events.register(this) { type, text ->
-                   when (type) {
-                       "broadcast" -> if (text.isNotEmpty()) infoDialog("إشعار من السيرفر", text)
-                       "update" -> offerUpdate(text.toLongOrNull() ?: 0)
-                       "kicked" -> forceLogout(text)
-                       "logout" -> show("gate")
-                       "reload" -> { currentProfile()?.let { startLoad(true) } }
-                   }
-               }
-               refreshHome()
+           findViewById<Button>(R.id.btn_login).setOnClickListener { doLogin() }
+           findViewById<Button>(R.id.btn_login_back).setOnClickListener { show("gate") }
+           findViewById<TextView>(R.id.cb_auto).setOnClickListener {
+             autoLogin = !autoLogin
+             (it as TextView).text = if (autoLogin) "☑ دخول تلقائي عند التشغيل" else "☐ دخول تلقائي عند التشغيل"
+             sp.put("auto_login", autoLogin)
            }
+           autoLogin = sp.b("auto_login", false)
+           findViewById<TextView>(R.id.cb_auto).text =
+             if (autoLogin) "☑ دخول تلقائي عند التشغيل" else "☐ دخول تلقائي عند التشغيل"
 
-           override fun onPause() {
-               Events.unregister(this, receiver); receiver = null
-               h.removeCallbacksAndMessages(null)
-               super.onPause()
+           findViewById<Button>(R.id.btn_connect).setOnClickListener { connect() }
+           findViewById<Button>(R.id.btn_saved).setOnClickListener { savedServers() }
+           findViewById<Button>(R.id.btn_server_back).setOnClickListener { show(if (sp.s("auth_user").isNotEmpty()) "home" else "gate") }
+
+           findViewById<View>(R.id.tile_live).setOnClickListener { openLive() }
+           findViewById<View>(R.id.tile_movies).setOnClickListener { openGrid("movie") }
+           findViewById<View>(R.id.tile_series).setOnClickListener { openGrid("series") }
+           findViewById<View>(R.id.tile_switch).setOnClickListener { fillServerForm(); show("server") }
+           findViewById<View>(R.id.tile_reload).setOnClickListener { startLoad(true) }
+           findViewById<View>(R.id.tile_exit).setOnClickListener { finishAffinity() }
+           findViewById<View>(R.id.tile_admin).setOnClickListener { openAdmin() }
+           findViewById<View>(R.id.tile_update).setOnClickListener { checkUpdate(true) }
+           findViewById<View>(R.id.tile_settings).setOnClickListener { openSettings() }
+           findViewById<View>(R.id.tile_account).setOnClickListener { openAccount() }
+           findViewById<Button>(R.id.btn_busy_cancel).setOnClickListener { cancelLoad() }
+           findViewById<Button>(R.id.btn_watchdog_retry).setOnClickListener {
+             wdBar.visibility = View.GONE; startLoad(true)
            }
+         }
 
-           override fun onDestroy() {
-               Remote.stop(this, sessionListener); sessionListener = null
-               dlgProgress?.dismiss()
-               super.onDestroy()
+         private fun show(which: String) {
+           box = which
+           gateBox.visibility = if (which == "gate") View.VISIBLE else View.GONE
+           loginBox.visibility = if (which == "login") View.VISIBLE else View.GONE
+           serverBox.visibility = if (which == "server") View.VISIBLE else View.GONE
+           homeBox.visibility = if (which == "home") View.VISIBLE else View.GONE
+           if (which == "server") fillServerForm()
+           if (which == "home") refreshHome()
+         }
+
+         private fun refreshHome() {
+           if (box != "home") return
+           val exp = Catalog.expiry.ifBlank { "-" }
+           homeExp.text = "قائمة التشغيل الحالية تنتهي: $exp"
+           tvHomeStatus.text = when {
+             Loader.busy -> "جارٍ التحميل…"
+             Catalog.loaded -> "${Catalog.live.size + Catalog.movie.size + Catalog.series.size} عنصر • ${Catalog.status}"
+             else -> "لم تُحمّل قائمة بعد"
            }
+           tvLiveCount.text = if (Catalog.live.isEmpty()) "اضغط للتحميل" else "${Catalog.live.size} قناة"
+         }
 
-           /* ------------------------------ الربط ------------------------------ */
+         /* ------------------------------ الجلسة ------------------------------ */
 
-           private fun bind() {
-               gateBox = findViewById(R.id.gateBox)
-               loginBox = findViewById(R.id.loginBox)
-               serverBox = findViewById(R.id.serverBox)
-               homeBox = findViewById(R.id.homeBox)
-               busyBox = findViewById(R.id.busyBox)
-               wdBar = findViewById(R.id.watchdogBar)
-               tvBusy = findViewById(R.id.tv_busy)
-               tvVer = findViewById(R.id.tv_ver)
-               homeExp = findViewById(R.id.home_exp)
-               tvHomeStatus = findViewById(R.id.tv_home_status)
-               tvLiveCount = findViewById(R.id.tv_live_count)
-               tvLoginStatus = findViewById(R.id.tv_login_status)
-               tvServerStatus = findViewById(R.id.tv_server_status)
-               spType = findViewById(R.id.sp_type)
-               etName = findViewById(R.id.et_name)
-               etUrl = findViewById(R.id.et_url)
-               etUser = findViewById(R.id.et_user)
-               etPass = findViewById(R.id.et_pass)
-               etMac = findViewById(R.id.et_mac)
-               etLUser = findViewById(R.id.et_luser)
-               etLPass = findViewById(R.id.et_lpass)
-
-               tvVer.text = "الإصدار " + appVersion(this) + (if (Remote.ready()) " • سحابي" else " • محلي")
-
-               spType.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item,
-                   listOf("M3U / رابط قائمة", "Xtream Codes", "MAC Portal (Stalker)"))
-                   .also { it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-               spType.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-                   override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, pos: Int, id: Long) {
-                       etUser.visibility = if (pos == 1) View.VISIBLE else View.GONE
-                       etPass.visibility = if (pos == 1) View.VISIBLE else View.GONE
-                       etMac.visibility = if (pos == 2) View.VISIBLE else View.GONE
-                   }
-
-                   override fun onNothingSelected(p: android.widget.AdapterView<*>?) {}
-               }
-
-               findViewById<Button>(R.id.btn_login_open).setOnClickListener { show("login"); focus(etLUser) }
-               findViewById<Button>(R.id.btn_direct).setOnClickListener {
-                   sp.put("auth_user", sp.s("guest_user", "guest")); fillServerForm(); show("server")
-               }
-               findViewById<View>(R.id.btn_admin_open).setOnClickListener { openAdmin() }
-               findViewById<View>(R.id.btn_update_open).setOnClickListener { checkUpdate(true) }
-               findViewById<View>(R.id.btn_theme_toggle).setOnClickListener {
-                   sp.put("theme", if (sp.s("theme", "night") == "night") "day" else "night")
-                   (getApplication() as NovaApp).applyTheme()
-                   recreate()
-               }
-
-               findViewById<Button>(R.id.btn_login).setOnClickListener { doLogin() }
-               findViewById<Button>(R.id.btn_login_back).setOnClickListener { show("gate") }
-               findViewById<TextView>(R.id.cb_auto).setOnClickListener {
-                   autoLogin = !autoLogin
-                   (it as TextView).text = if (autoLogin) "☑ دخول تلقائي عند التشغيل" else "☐ دخول تلقائي عند التشغيل"
-                   sp.put("auto_login", autoLogin)
-               }
-               autoLogin = sp.b("auto_login", false)
-               findViewById<TextView>(R.id.cb_auto).text =
-                   if (autoLogin) "☑ دخول تلقائي عند التشغيل" else "☐ دخول تلقائي عند التشغيل"
-
-               findViewById<Button>(R.id.btn_connect).setOnClickListener { connect() }
-               findViewById<Button>(R.id.btn_saved).setOnClickListener { savedServers() }
-               findViewById<Button>(R.id.btn_server_back).setOnClickListener { show(if (sp.s("auth_user").isNotEmpty()) "home" else "gate") }
-
-               findViewById<View>(R.id.tile_live).setOnClickListener { openLive() }
-               findViewById<View>(R.id.tile_movies).setOnClickListener { openGrid("movie") }
-               findViewById<View>(R.id.tile_series).setOnClickListener { openGrid("series") }
-               findViewById<View>(R.id.tile_switch).setOnClickListener { fillServerForm(); show("server") }
-               findViewById<View>(R.id.tile_reload).setOnClickListener { startLoad(true) }
-               findViewById<View>(R.id.tile_exit).setOnClickListener { finishAffinity() }
-               findViewById<View>(R.id.tile_admin).setOnClickListener { openAdmin() }
-               findViewById<View>(R.id.tile_update).setOnClickListener { checkUpdate(true) }
-               findViewById<View>(R.id.tile_settings).setOnClickListener { openSettings() }
-               findViewById<View>(R.id.tile_account).setOnClickListener { openAccount() }
-               findViewById<Button>(R.id.btn_busy_cancel).setOnClickListener { cancelLoad() }
-               findViewById<Button>(R.id.btn_watchdog_retry).setOnClickListener {
-                   wdBar.visibility = View.GONE; startLoad(true)
-               }
+         private fun ensureSession() {
+           sess = sp.s("auth_session")
+           if (sess.isEmpty()) {
+             sess = UUID.randomUUID().toString().take(18)
+             sp.put("auth_session", sess)
            }
+         }
 
-           private fun show(which: String) {
-               box = which
-               gateBox.visibility = if (which == "gate") View.VISIBLE else View.GONE
-               loginBox.visibility = if (which == "login") View.VISIBLE else View.GONE
-               serverBox.visibility = if (which == "server") View.VISIBLE else View.GONE
-               homeBox.visibility = if (which == "home") View.VISIBLE else View.GONE
-               if (which == "server") fillServerForm()
-               if (which == "home") refreshHome()
+         private fun startSessionWatch() {
+           val u = sp.s("auth_user")
+           if (u.isEmpty() || u == "guest") return
+           sessionListener = Remote.watchSession(this, u, sess) {
+             runOnUiThread { forceLogout("تم فتح الحساب على جهاز آخر") }
            }
+         }
 
-           private fun refreshHome() {
-               if (box != "home") return
-               val exp = Catalog.expiry.ifBlank { "-" }
-               homeExp.text = "قائمة التشغيل الحالية تنتهي: $exp"
-               tvHomeStatus.text = when {
-                   Loader.busy -> "جارٍ التحميل…"
-                   Catalog.loaded -> "${Catalog.live.size + Catalog.movie.size + Catalog.series.size} عنصر • ${Catalog.status}"
-                   else -> "لم تُحمّل قائمة بعد"
-               }
-               tvLiveCount.text = if (Catalog.live.isEmpty()) "اضغط للتحميل" else "${Catalog.live.size} قناة"
+         private fun forceLogout(why: String) {
+           Remote.logout(this, sp.s("auth_user"), sess)
+           toast(why)
+           show(if (Remote.ready()) "gate" else "server")
+         }
+
+         private fun doLogin() {
+           val u = etLUser.text.toString().trim()
+           val p = etLPass.text.toString()
+           if (u.isEmpty() || p.isEmpty()) { tvLoginStatus.text = "أدخل المستخدم وكلمة المرور"; return }
+           hideKeyboard(etLPass)
+           tvLoginStatus.text = if (Remote.ready()) "جاري التحقق من السيرفر…" else "تحقق محلي…"
+           busy("تسجيل الدخول…")
+           Remote.login(this, u, p, sess) { ok, msg ->
+             busyDone()
+             tvLoginStatus.text = msg
+             if (ok) {
+               sp.put("auth_user", u)
+               sp.put("auth_pass_cache", p)
+               sp.put("auto_login", true)
+               Remote.pushToken(this)
+               Remote.subscribeAll(this)
+               startSessionWatch()
+               val prof = currentProfile()
+               if (prof == null) { fillServerForm(); show("server"); toast("أدخل بيانات السيرفر") }
+               else { show("home"); startLoad(false) }
+             }
            }
+         }
 
-           /* ------------------------------ الجلسة ------------------------------ */
+         /* ------------------------------ السيرفر ------------------------------ */
 
-           private fun ensureSession() {
-               sess = sp.s("auth_session")
-               if (sess.isEmpty()) {
-                   sess = UUID.randomUUID().toString().take(18)
-                   sp.put("auth_session", sess)
-               }
+         private fun currentProfile(): Profile? {
+           val t = sp.s("last")
+           if (t.isEmpty()) return null
+           return try { Profile.fromJson(JSONObject(t)) } catch (e: Exception) { null }
+         }
+
+         private fun fillServerForm() {
+           val p = currentProfile() ?: return
+           etUrl.setText(p.url); etUser.setText(p.user); etPass.setText(p.pass); etMac.setText(p.mac); etName.setText(p.name)
+           spType.setSelection(when (p.type) { "xtream" -> 1; "mac" -> 2; else -> 0 })
+         }
+
+         private fun connect() {
+           val p = Profile()
+           p.type = when (spType.selectedItemPosition) { 1 -> "xtream"; 2 -> "mac"; else -> "m3u" }
+           p.url = etUrl.text.toString().trim()
+           p.user = etUser.text.toString().trim()
+           p.pass = etPass.text.toString()
+           p.mac = etMac.text.toString().trim()
+           p.name = etName.text.toString().trim().ifBlank { if (p.type == "mac") p.mac else p.url }
+           p.epg = ""
+           p.added = System.currentTimeMillis()
+           if (p.url.isEmpty()) { tvServerStatus.text = "أدخل الرابط أو البوابة"; return }
+           if (p.type == "xtream" && (p.user.isEmpty() || p.pass.isEmpty())) { tvServerStatus.text = "أدخل المستخدم وكلمة المرور"; return }
+           if (p.type == "mac" && p.mac.isEmpty()) { tvServerStatus.text = "أدخل عنوان MAC"; return }
+           saveProfile(p)
+           tvServerStatus.text = "تم الحفظ: ${p.name}"
+           startLoad(false)
+         }
+
+         private fun saveProfile(p: Profile) {
+           sp.put("last", p.toJson().toString())
+           try {
+             val a = JSONArray(sp.s("servers", "[]"))
+             var idx = -1
+             for (i in 0 until a.length()) if (a.getJSONObject(i).optString("url") == p.url && a.getJSONObject(i).optString("type") == p.type) idx = i
+             val o = p.toJson()
+             if (idx >= 0) a.put(idx, o) else a.put(o)
+             sp.put("servers", a.toString())
+           } catch (t: Throwable) { Crash.log(t) }
+         }
+
+         private fun savedServers() {
+           val a = try { JSONArray(sp.s("servers", "[]")) } catch (t: Throwable) { JSONArray() }
+           if (a.length() == 0) { toast("لا توجد سيرفرات محفوظة"); return }
+           val names = ArrayList<String>()
+           for (i in 0 until a.length()) {
+             val o = a.getJSONObject(i)
+             names.add(o.optString("name", "سيرفر " + (i + 1)) + " • " + o.optString("type"))
            }
-
-           private fun startSessionWatch() {
-               val u = sp.s("auth_user")
-               if (u.isEmpty() || u == "guest") return
-               sessionListener = Remote.watchSession(this, u, sess) {
-                   runOnUiThread { forceLogout("تم فتح الحساب على جهاز آخر") }
-               }
-           }
-
-           private fun forceLogout(why: String) {
-               Remote.logout(this, sp.s("auth_user"), sess)
-               toast(why)
-               show(if (Remote.ready()) "gate" else "server")
-           }
-
-           private fun doLogin() {
-               val u = etLUser.text.toString().trim()
-               val p = etLPass.text.toString()
-               if (u.isEmpty() || p.isEmpty()) { tvLoginStatus.text = "أدخل المستخدم وكلمة المرور"; return }
-               hideKeyboard(etLPass)
-               tvLoginStatus.text = if (Remote.ready()) "جاري التحقق من السيرفر…" else "تحقق محلي…"
-               busy("تسجيل الدخول…")
-               Remote.login(this, u, p, sess) { ok, msg ->
-                   busyDone()
-                   tvLoginStatus.text = msg
-                   if (ok) {
-                       sp.put("auth_user", u)
-                       sp.put("auth_pass_cache", p)
-                       sp.put("auto_login", true)
-                       Remote.pushToken(this)
-                       Remote.subscribeAll(this)
-                       startSessionWatch()
-                       val prof = currentProfile()
-                       if (prof == null) { fillServerForm(); show("server"); toast("أدخل بيانات السيرفر") }
-                       else { show("home"); startLoad(false) }
-                   }
-               }
-           }
-
-           /* ------------------------------ السيرفر ------------------------------ */
-
-           private fun currentProfile(): Profile? {
-               val t = sp.s("last")
-               if (t.isEmpty()) return null
-               return try { Profile.fromJson(JSONObject(t)) } catch (e: Exception) { null }
-           }
-
-           private fun fillServerForm() {
-               val p = currentProfile() ?: return
-               etUrl.setText(p.url); etUser.setText(p.user); etPass.setText(p.pass); etMac.setText(p.mac); etName.setText(p.name)
-               spType.setSelection(when (p.type) { "xtream" -> 1; "mac" -> 2; else -> 0 })
-           }
-
-           private fun connect() {
-               val p = Profile()
-               p.type = when (spType.selectedItemPosition) { 1 -> "xtream"; 2 -> "mac"; else -> "m3u" }
-               p.url = etUrl.text.toString().trim()
-               p.user = etUser.text.toString().trim()
-               p.pass = etPass.text.toString()
-               p.mac = etMac.text.toString().trim()
-               p.name = etName.text.toString().trim().ifBlank { if (p.type == "mac") p.mac else p.url }
-               p.epg = ""
-               p.added = System.currentTimeMillis()
-               if (p.url.isEmpty()) { tvServerStatus.text = "أدخل الرابط أو البوابة"; return }
-               if (p.type == "xtream" && (p.user.isEmpty() || p.pass.isEmpty())) { tvServerStatus.text = "أدخل المستخدم وكلمة المرور"; return }
-               if (p.type == "mac" && p.mac.isEmpty()) { tvServerStatus.text = "أدخل عنوان MAC"; return }
-               saveProfile(p)
-               tvServerStatus.text = "تم الحفظ: ${p.name}"
-               startLoad(false)
-           }
-
-           private fun saveProfile(p: Profile) {
+           val dlg = AlertDialog.Builder(this).setTitle("السيرفرات المحفوظة")
+             .setItems(names.toTypedArray()) { d, i ->
+               val p = Profile.fromJson(a.getJSONObject(i))
                sp.put("last", p.toJson().toString())
-               try {
-                   val a = JSONArray(sp.s("servers", "[]"))
-                   var idx = -1
-                   for (i in 0 until a.length()) if (a.getJSONObject(i).optString("url") == p.url && a.getJSONObject(i).optString("type") == p.type) idx = i
-                   val o = p.toJson()
-                   if (idx >= 0) a.put(idx, o) else a.put(o)
-                   sp.put("servers", a.toString())
-               } catch (t: Throwable) { Crash.log(t) }
-           }
+               fillServerForm()
+               d.dismiss()
+               startLoad(true)
+             }.setNeutralButton("حذف الكل") { _, _ ->
+               sp.put("servers", "[]"); toast("حُذفت قائمة السيرفرات")
+             }.setNegativeButton("إغلاق", null)
+             .create()
+           dlg.show()
+         }
 
-           private fun savedServers() {
-               val a = try { JSONArray(sp.s("servers", "[]")) } catch (t: Throwable) { JSONArray() }
-               if (a.length() == 0) { toast("لا توجد سيرفرات محفوظة"); return }
-               val names = ArrayList<String>()
-               for (i in 0 until a.length()) {
-                   val o = a.getJSONObject(i)
-                   names.add(o.optString("name", "سيرفر " + (i + 1)) + " • " + o.optString("type"))
+         private fun cancelLoad() {
+           Loader.cancel = true
+           busyDone()
+           wdBar.visibility = View.GONE
+           toast("أُلغي التحميل")
+         }
+
+         private fun startLoad(force: Boolean) {
+           val p = currentProfile()
+           if (p == null) { show("server"); toast("أدخل بيانات السيرفر أولًا"); return }
+           busy("جاري تحميل القائمة…")
+           armWatchdog()
+           Loader.load(this, p, force, { txt -> runOnUiThread { tvBusy.text = txt } }) { ok, msg ->
+             disarmWatchdog()
+             busyDone()
+             if (ok) {
+               if (sp.s("auth_user").isEmpty()) sp.put("auth_user", "guest")
+               show("home")
+               startSessionWatch()
+               if (msg.contains("كاش")) tvHomeStatus.text = msg
+               toast("جاهز: ${Catalog.live.size} قناة • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل")
+               // الجلب الخلفي (كل الأقسام بكل صفحاتها) — نعرض تقدّمه هنا ويُحدَّث كل 1.2 ثانية
+               if (Catalog.bgRun) { bgWasRun = true; h.removeCallbacks(bgTick); h.postDelayed(bgTick, 1200) }
+             } else {
+               toast(msg.ifBlank { "تعذّر التحميل" })
+               wdBar.visibility = View.VISIBLE
+               findViewById<TextView>(R.id.tv_watchdog).text = "تعذّر تحميل القائمة — تحقق من الرابط/الاشتراك"
+             }
+           }
+         }
+
+         /* ------------------------------ الرقابة ------------------------------ */
+
+         private var bgWasRun = false
+
+         /** مؤقّت خفيف: يعرض «جلب المحتوى… n/m قسم» أثناء الجلب الخلفي ثم النتيجة النهائية. */
+         private val bgTick = object : Runnable {
+           override fun run() {
+             try {
+               if (Catalog.bgRun) {
+                 tvHomeStatus.text = "جلب المحتوى… " + Catalog.bgMsg
+                 h.postDelayed(this, 1200)
+               } else if (bgWasRun) {
+                 bgWasRun = false
+                 tvHomeStatus.text = "${Catalog.live.size + Catalog.movie.size + Catalog.series.size} عنصر • ${Catalog.status}"
+                 toast("اكتمل الجلب: ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل")
                }
-               val dlg = AlertDialog.Builder(this).setTitle("السيرفرات المحفوظة")
-                   .setItems(names.toTypedArray()) { d, i ->
-                       val p = Profile.fromJson(a.getJSONObject(i))
-                       sp.put("last", p.toJson().toString())
-                       fillServerForm()
-                       d.dismiss()
-                       startLoad(true)
-                   }.setNeutralButton("حذف الكل") { _, _ ->
-                       sp.put("servers", "[]"); toast("حُذفت قائمة السيرفرات")
-                   }.setNegativeButton("إغلاق", null)
-                   .create()
-               dlg.show()
+             } catch (t: Throwable) { Crash.log(t) }
            }
+         }
 
-           private fun cancelLoad() {
-               Loader.cancel = true
-               busyDone()
-               wdBar.visibility = View.GONE
-               toast("أُلغي التحميل")
+         private fun armWatchdog() {
+           disarmWatchdog()
+           val r = Runnable {
+             if (Loader.busy) {
+               wdBar.visibility = View.VISIBLE
+               findViewById<TextView>(R.id.tv_watchdog).text = "البوابة لا تستجيب منذ 25 ثانية"
+             }
            }
+           loadTimeout = r
+           h.postDelayed(r, 25_000)
+         }
 
-           private fun startLoad(force: Boolean) {
-               val p = currentProfile()
-               if (p == null) { show("server"); toast("أدخل بيانات السيرفر أولًا"); return }
-               busy("جاري تحميل القائمة…")
-               armWatchdog()
-               Loader.load(this, p, force, { txt -> runOnUiThread { tvBusy.text = txt } }) { ok, msg ->
-                   disarmWatchdog()
-                   busyDone()
-                   if (ok) {
-                       if (sp.s("auth_user").isEmpty()) sp.put("auth_user", "guest")
-                       show("home")
-                       startSessionWatch()
-                       if (msg.contains("كاش")) tvHomeStatus.text = msg
-                       toast("جاهز: ${Catalog.live.size} قناة • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل")
-                       // الجلب الخلفي (كل الأقسام بكل صفحاتها) — نعرض تقدّمه هنا ويُحدَّث كل 1.2 ثانية
-                       if (Catalog.bgRun) { bgWasRun = true; h.removeCallbacks(bgTick); h.postDelayed(bgTick, 1200) }
-                   } else {
-                       toast(msg.ifBlank { "تعذّر التحميل" })
-                       wdBar.visibility = View.VISIBLE
-                       findViewById<TextView>(R.id.tv_watchdog).text = "تعذّر تحميل القائمة — تحقق من الرابط/الاشتراك"
+         private fun disarmWatchdog() {
+           loadTimeout?.let { h.removeCallbacks(it) }
+           loadTimeout = null
+           wdBar.visibility = View.GONE
+         }
+
+         private fun busy(t: String) {
+           tvBusy.text = t
+           busyBox.visibility = View.VISIBLE
+         }
+
+         private fun busyDone() {
+           busyBox.visibility = View.GONE
+         }
+
+         /* ------------------------------ التنقل ------------------------------ */
+
+         private fun openLive() {
+           if (!Catalog.loaded) { startLoad(false); return }
+           // (8.34) أمر صريح «وضع القنوات» + إعادة استخدام نفس الشاشة ⇒ ما تبقاش على فلم/حلقة
+           val i = android.content.Intent(this, LiveActivity::class.java)
+           i.putExtra("mode", "live")
+           i.addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP or android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+           startActivity(i)
+         }
+
+         private fun openGrid(kind: String) {
+           if (!Catalog.loaded) { startLoad(false); return }
+           val i = android.content.Intent(this, GridActivity::class.java)
+           i.putExtra("kind", kind)
+           startActivity(i)
+         }
+
+         /** بدون لوحة أدمن داخل التطبيق: الزر يفتح شاشة الحساب/الاشتراك. */
+         private fun openAdmin() = openAccount()
+
+         private fun openAccount() {
+           val p = currentProfile()
+           val u = sp.s("auth_user")
+           val o = JSONObject()
+           p?.let {
+             o.put("النوع", it.type); o.put("الرابط", it.url)
+             if (it.user.isNotEmpty()) o.put("المستخدم", it.user)
+             if (it.mac.isNotEmpty()) o.put("MAC", it.mac)
+           }
+           o.put("الحساب", u.ifBlank { "ضيف" })
+           o.put("انتهاء الاشتراك", Catalog.expiry)
+           o.put("حالة الحساب", Catalog.status)
+           o.put("جلسة", sess)
+           o.put("FCM", sp.s("fcm", "غير مسجّل").take(18))
+           val msg = StringBuilder()
+           for (k in o.keys()) msg.append(k).append(": ").append(o.optString(k)).append("\n")
+           AlertDialog.Builder(this).setTitle("الحساب").setMessage(msg.toString())
+             .setPositiveButton("إغلاق", null)
+             .setNeutralButton("خروج من الحساب") { _, _ -> forceLogout("تم الخروج") }
+             .show()
+         }
+
+         private fun openSettings() {
+           val items = listOf(
+             "محاولة ذكية للتحميل (بديل)\uFE0E", "تبديل الثيم (Crystal / Maroon)", "تحميل جديد إجباري",
+             "مسح المفضلة", "مسح سجل المشاهدة", "حذف ذاكرة الكاش", "سجل الأعطال", "حالة الذاكرة",
+             "التحقق من التحديث", "حول التطبيق"
+           )
+           pickDialog("الإعدادات", items) { i ->
+             when (i) {
+               0 -> {
+                 sp.put("smart_alt", !sp.b("smart_alt", true))
+                 toast("المصدر البديل: " + if (sp.b("smart_alt", true)) "مفعّل" else "معطّل")
+               }
+               1 -> {
+                 sp.put("theme", if (sp.s("theme", "night") == "night") "day" else "night")
+                 (getApplication() as NovaApp).applyTheme(); recreate()
+               }
+               2 -> startLoad(true)
+               3 -> { sp.put("favs", "[]"); toast("مسحت المفضلة") }
+               4 -> { sp.put("recents", "[]"); toast("مسحت السجل") }
+               5 -> { Memory.trim(this, true); toast("نُظّف الكاش") }
+               6 -> {
+                 val log = Crash.read(this)
+                 AlertDialog.Builder(this).setTitle("سجل الأعطال").setMessage(log)
+                   .setPositiveButton("مسح السجل") { _, _ -> Crash.clear(this); toast("مُسح") }
+                   .setNeutralButton("مشاركة/نسخ") { _, _ ->
+                     try {                                    // v8.23: إرسال السجل بضغطة (واتساب، تلغرام، بريد…)
+                       val i = android.content.Intent(android.content.Intent.ACTION_SEND)
+                       i.type = "text/plain"
+                       i.putExtra(android.content.Intent.EXTRA_SUBJECT, "NovaPlay " + appVersion(this) + " — سجل الأعطال")
+                       i.putExtra(android.content.Intent.EXTRA_TEXT, "NovaPlay " + appVersion(this) + "\n" + log.takeLast(4000))
+                       startActivity(android.content.Intent.createChooser(i, "إرسال سجل الأعطال"))
+                     } catch (t: Throwable) {
+                       try {
+                         val cb = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                         cb.setPrimaryClip(android.content.ClipData.newPlainText("NovaPlay log", log.takeLast(4000)))
+                         toast("نُسخ السجل — الصقه في أي تطبيق")
+                       } catch (e: Throwable) { toast("تعذر النسخ") }
+                     }
                    }
+                   .setNegativeButton("إغلاق", null).show()
                }
+               7 -> infoDialog("الذاكرة", Memory.dump(this))
+               8 -> checkUpdate(true)
+               9 -> infoDialog("NovaPlay", "مشغّل IPTV — Kotlin + media3\n" +
+                 "الثيم: Crystal Black × Gold / Nova Maroon\n" + appVersion(this) +
+                 "\nكل شيء يعمل داخل ملف GitHub Actions واحد.")
+             }
            }
+         }
 
-           /* ------------------------------ الرقابة ------------------------------ */
+         /* ------------------------------ التحديث ------------------------------ */
 
-           private var bgWasRun = false
-
-           /** مؤقّت خفيف: يعرض «جلب المحتوى… n/m قسم» أثناء الجلب الخلفي ثم النتيجة النهائية. */
-           private val bgTick = object : Runnable {
-               override fun run() {
-                   try {
-                       if (Catalog.bgRun) {
-                           tvHomeStatus.text = "جلب المحتوى… " + Catalog.bgMsg
-                           h.postDelayed(this, 1200)
-                       } else if (bgWasRun) {
-                           bgWasRun = false
-                           tvHomeStatus.text = "${Catalog.live.size + Catalog.movie.size + Catalog.series.size} عنصر • ${Catalog.status}"
-                           toast("اكتمل الجلب: ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل")
-                       }
-                   } catch (t: Throwable) { Crash.log(t) }
-               }
+         private fun checkUpdate(manual: Boolean) {
+           if (manual) busy("فحص التحديث…")
+           Ota.check(this, manual) { info, msg ->
+             if (manual) busyDone()
+             if (info == null) { if (manual) toast(msg.ifBlank { "لا يوجد تحديث" }); return@check }
+             AlertDialog.Builder(this).setTitle("تحديث متوفر " + info.name)
+               .setMessage(info.note.ifBlank { "تنزيل وتثبيت التحديث الآن؟" })
+               .setPositiveButton("تنزيل") { _, _ -> doUpdate(info) }
+               .setNegativeButton("لاحقًا", null).show()
            }
+         }
 
-           private fun armWatchdog() {
-               disarmWatchdog()
-               val r = Runnable {
-                   if (Loader.busy) {
-                       wdBar.visibility = View.VISIBLE
-                       findViewById<TextView>(R.id.tv_watchdog).text = "البوابة لا تستجيب منذ 25 ثانية"
-                   }
-               }
-               loadTimeout = r
-               h.postDelayed(r, 25_000)
+         private fun offerUpdate(code: Long) {
+           if (code <= 0) return
+           Ota.check(this, true) { info, _ -> if (info != null) doUpdate(info) }
+         }
+
+         private fun doUpdate(info: Ota.Info) {
+           OtaFlag.wantCancel = false
+           val v = LinearLayout(this)
+           v.orientation = LinearLayout.VERTICAL
+           v.setPadding(40, 30, 40, 10)
+           val pb = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
+           pb.max = 100
+           val tv = TextView(this)
+           tv.textSize = 13f
+           v.addView(pb, LinearLayout.LayoutParams(-1, -2))
+           v.addView(tv, LinearLayout.LayoutParams(-1, -2))
+           bar = pb; barTxt = tv
+           dlgProgress = AlertDialog.Builder(this).setTitle("تنزيل التحديث")
+             .setView(v).setNegativeButton("إلغاء") { d, _ -> OtaFlag.wantCancel = true; d.dismiss() }
+             .setCancelable(false).show()
+           Ota.download(this, info, { pct, txt ->
+             pb.progress = pct; tv.text = txt
+           }) { f, msg ->
+             dlgProgress?.dismiss(); dlgProgress = null
+             if (f == null) { toast(msg); return@download }
+             if (Ota.install(this, f)) toast("افتح شاشة التثبيت لإكمال التحديث")
            }
+         }
 
-           private fun disarmWatchdog() {
-               loadTimeout?.let { h.removeCallbacks(it) }
-               loadTimeout = null
-               wdBar.visibility = View.GONE
+         override fun onBackPressed() {
+           when {
+             busyBox.visibility == View.VISIBLE -> cancelLoad()
+             box == "home" -> finishAffinity()
+             box == "login" || box == "server" -> show(if (sp.s("auth_user").isNotEmpty()) "home" else "gate")
+             else -> super.onBackPressed()
            }
+         }
 
-           private fun busy(t: String) {
-               tvBusy.text = t
-               busyBox.visibility = View.VISIBLE
-           }
-
-           private fun busyDone() {
-               busyBox.visibility = View.GONE
-           }
-
-           /* ------------------------------ التنقل ------------------------------ */
-
-           private fun openLive() {
-               if (!Catalog.loaded) { startLoad(false); return }
-               startActivity(android.content.Intent(this, LiveActivity::class.java))
-           }
-
-           private fun openGrid(kind: String) {
-               if (!Catalog.loaded) { startLoad(false); return }
-               val i = android.content.Intent(this, GridActivity::class.java)
-               i.putExtra("kind", kind)
-               startActivity(i)
-           }
-
-           /** بدون لوحة أدمن داخل التطبيق: الزر يفتح شاشة الحساب/الاشتراك. */
-           private fun openAdmin() = openAccount()
-
-           private fun openAccount() {
-               val p = currentProfile()
-               val u = sp.s("auth_user")
-               val o = JSONObject()
-               p?.let {
-                   o.put("النوع", it.type); o.put("الرابط", it.url)
-                   if (it.user.isNotEmpty()) o.put("المستخدم", it.user)
-                   if (it.mac.isNotEmpty()) o.put("MAC", it.mac)
-               }
-               o.put("الحساب", u.ifBlank { "ضيف" })
-               o.put("انتهاء الاشتراك", Catalog.expiry)
-               o.put("حالة الحساب", Catalog.status)
-               o.put("جلسة", sess)
-               o.put("FCM", sp.s("fcm", "غير مسجّل").take(18))
-               val msg = StringBuilder()
-               for (k in o.keys()) msg.append(k).append(": ").append(o.optString(k)).append("\n")
-               AlertDialog.Builder(this).setTitle("الحساب").setMessage(msg.toString())
-                   .setPositiveButton("إغلاق", null)
-                   .setNeutralButton("خروج من الحساب") { _, _ -> forceLogout("تم الخروج") }
-                   .show()
-           }
-
-           private fun openSettings() {
-               val items = listOf(
-                   "محاولة ذكية للتحميل (بديل)\uFE0E", "تبديل الثيم (Crystal / Maroon)", "تحميل جديد إجباري",
-                   "مسح المفضلة", "مسح سجل المشاهدة", "حذف ذاكرة الكاش", "سجل الأعطال", "حالة الذاكرة",
-                   "التحقق من التحديث", "حول التطبيق"
-               )
-               pickDialog("الإعدادات", items) { i ->
-                   when (i) {
-                       0 -> {
-                           sp.put("smart_alt", !sp.b("smart_alt", true))
-                           toast("المصدر البديل: " + if (sp.b("smart_alt", true)) "مفعّل" else "معطّل")
-                       }
-                       1 -> {
-                           sp.put("theme", if (sp.s("theme", "night") == "night") "day" else "night")
-                           (getApplication() as NovaApp).applyTheme(); recreate()
-                       }
-                       2 -> startLoad(true)
-                       3 -> { sp.put("favs", "[]"); toast("مسحت المفضلة") }
-                       4 -> { sp.put("recents", "[]"); toast("مسحت السجل") }
-                       5 -> { Memory.trim(this, true); toast("نُظّف الكاش") }
-                       6 -> {
-                           val log = Crash.read(this)
-                           AlertDialog.Builder(this).setTitle("سجل الأعطال").setMessage(log)
-                               .setPositiveButton("مسح السجل") { _, _ -> Crash.clear(this); toast("مُسح") }
-                               .setNeutralButton("مشاركة/نسخ") { _, _ ->
-                                   try {                                    // v8.23: إرسال السجل بضغطة (واتساب، تلغرام، بريد…)
-                                       val i = android.content.Intent(android.content.Intent.ACTION_SEND)
-                                       i.type = "text/plain"
-                                       i.putExtra(android.content.Intent.EXTRA_SUBJECT, "NovaPlay " + appVersion(this) + " — سجل الأعطال")
-                                       i.putExtra(android.content.Intent.EXTRA_TEXT, "NovaPlay " + appVersion(this) + "\n" + log.takeLast(4000))
-                                       startActivity(android.content.Intent.createChooser(i, "إرسال سجل الأعطال"))
-                                   } catch (t: Throwable) {
-                                       try {
-                                           val cb = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                           cb.setPrimaryClip(android.content.ClipData.newPlainText("NovaPlay log", log.takeLast(4000)))
-                                           toast("نُسخ السجل — الصقه في أي تطبيق")
-                                       } catch (e: Throwable) { toast("تعذر النسخ") }
-                                   }
-                               }
-                               .setNegativeButton("إغلاق", null).show()
-                       }
-                       7 -> infoDialog("الذاكرة", Memory.dump(this))
-                       8 -> checkUpdate(true)
-                       9 -> infoDialog("NovaPlay", "مشغّل IPTV — Kotlin + media3\n" +
-                           "الثيم: Crystal Black × Gold / Nova Maroon\n" + appVersion(this) +
-                           "\nكل شيء يعمل داخل ملف GitHub Actions واحد.")
-                   }
-               }
-           }
-
-           /* ------------------------------ التحديث ------------------------------ */
-
-           private fun checkUpdate(manual: Boolean) {
-               if (manual) busy("فحص التحديث…")
-               Ota.check(this, manual) { info, msg ->
-                   if (manual) busyDone()
-                   if (info == null) { if (manual) toast(msg.ifBlank { "لا يوجد تحديث" }); return@check }
-                   AlertDialog.Builder(this).setTitle("تحديث متوفر " + info.name)
-                       .setMessage(info.note.ifBlank { "تنزيل وتثبيت التحديث الآن؟" })
-                       .setPositiveButton("تنزيل") { _, _ -> doUpdate(info) }
-                       .setNegativeButton("لاحقًا", null).show()
-               }
-           }
-
-           private fun offerUpdate(code: Long) {
-               if (code <= 0) return
-               Ota.check(this, true) { info, _ -> if (info != null) doUpdate(info) }
-           }
-
-           private fun doUpdate(info: Ota.Info) {
-               OtaFlag.wantCancel = false
-               val v = LinearLayout(this)
-               v.orientation = LinearLayout.VERTICAL
-               v.setPadding(40, 30, 40, 10)
-               val pb = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
-               pb.max = 100
-               val tv = TextView(this)
-               tv.textSize = 13f
-               v.addView(pb, LinearLayout.LayoutParams(-1, -2))
-               v.addView(tv, LinearLayout.LayoutParams(-1, -2))
-               bar = pb; barTxt = tv
-               dlgProgress = AlertDialog.Builder(this).setTitle("تنزيل التحديث")
-                   .setView(v).setNegativeButton("إلغاء") { d, _ -> OtaFlag.wantCancel = true; d.dismiss() }
-                   .setCancelable(false).show()
-               Ota.download(this, info, { pct, txt ->
-                   pb.progress = pct; tv.text = txt
-               }) { f, msg ->
-                   dlgProgress?.dismiss(); dlgProgress = null
-                   if (f == null) { toast(msg); return@download }
-                   if (Ota.install(this, f)) toast("افتح شاشة التثبيت لإكمال التحديث")
-               }
-           }
-
-           override fun onBackPressed() {
-               when {
-                   busyBox.visibility == View.VISIBLE -> cancelLoad()
-                   box == "home" -> finishAffinity()
-                   box == "login" || box == "server" -> show(if (sp.s("auth_user").isNotEmpty()) "home" else "gate")
-                   else -> super.onBackPressed()
-               }
-           }
-
-           private fun askNotifPermission() {
-               if (Build.VERSION.SDK_INT < 33) return
-               if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                   == PackageManager.PERMISSION_GRANTED) return
-               try {
-                   requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 71)
-               } catch (t: Throwable) { Crash.log(t) }
-           }
+         private fun askNotifPermission() {
+           if (Build.VERSION.SDK_INT < 33) return
+           if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+             == PackageManager.PERMISSION_GRANTED) return
+           try {
+             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 71)
+           } catch (t: Throwable) { Crash.log(t) }
+         }
        }
        NP_EOF
        cat <<'NP_EOF' > app/src/main/java/com/nova/play/Sources.kt
@@ -5427,7 +5490,10 @@ jobs:
                    val title = o.optString("title")
                    c.name = if (ep.isBlank()) title else "حلقة $ep${if (title.isNotBlank()) " — $title" else ""}"
                    c.id = o.optString("id")
-                   c.url = x.seriesUrl(c.id, o.optString("container_extension"))
+                   val xext = o.optString("container_extension")
+                   c.url = x.seriesUrl(c.id, xext)
+                   // (8.34) حاوية بديلة: كثير من لوحات Xtream تُعلن mp4 والحقيقة mkv ⇒ التبديل التلقائي يشتغل
+                   c.alt = x.seriesUrl(c.id, if (xext == "mp4") "mkv" else "mp4")
                    c.extra = o.optString("info_movie").take(200)
                    out.add(c)
                  }
@@ -5508,8 +5574,36 @@ jobs:
 
            /** أمر محلي قياسي عندما لا ترسل البوابة cmd: http://localhost/ch/<id>_ (نفس ما يبنيه MAG) */
            fun localCmd(id: String): String {
-             val n = id.substringBefore(":").replace(Regex("\\D"), "")
-             return if (n.isBlank()) "" else "http://localhost/ch/" + n + "_"
+             // (8.34) معرّف رقمي فقط (≤9 أرقام). قبل: كنا نُزيل كل غير الأرقام ⇒ أمر MAG
+             //        مشوّه مستخرج من base64 ⇒ البوابة ترد stream=. (رابط ميت) ⇒ 444.
+             val n = id.substringBefore(":").trim()
+             if (n.isEmpty() || n.length > 9 || !n.all { it.isDigit() }) return ""
+             return "http://localhost/ch/" + n + "_"
+           }
+
+           /** أول معرّف رقمي صالح من المرشّحين (يرفض base64/الروابط/المعرّفات المركّبة). */
+           fun firstNum(vararg ids: String): String {
+             for (v in ids) {
+               val t = v.substringBefore(":").trim()
+               if (t.isNotEmpty() && t.length <= 9 && t.all { it.isDigit() }) return t
+             }
+             return ""
+           }
+
+           /**
+           * (8.34) أمر create_link لفلم من معرّفه — نفس صيغة البوابة بالحرف:
+           *   {"type":"movie","stream_id":"<id>","stream_source":null,"target_container":"[\"mp4\"]"}
+           * مُجرّب على البوابة: يرجّع رابطًا سليمًا (play/movie.php?...&stream=<id>.mp4&play_token=…) ✅
+           */
+           fun movieCmd(id: String, ext: String = "mp4"): String {
+             return try {
+               val j = JSONObject()
+               j.put("type", "movie")
+               j.put("stream_id", id)
+               j.put("stream_source", JSONObject.NULL)
+               j.put("target_container", "[\"" + (if (ext.isBlank()) "mp4" else ext) + "\"]")
+               android.util.Base64.encodeToString(j.toString().toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+             } catch (t: Throwable) { Crash.log(t); "" }
            }
 
            // ------------------- (8.31) قواعد روابط البوابة (من اختبار البوابة الحقيقية) -------------------
@@ -5539,9 +5633,11 @@ jobs:
            fun brokenLink(u: String): Boolean {
              if (u.isBlank()) return true
              val l = u.lowercase()
-             if (!l.contains("/play/live.php")) return false
-             val m = Regex("[?&]stream=([^&]*)").find(u)?.groupValues?.get(1) ?: ""
-             return m.isBlank()
+             if (!l.contains("/play/")) return false
+             val m = Regex("[?&]stream=([^&]*)").find(u)?.groupValues?.get(1) ?: return true
+             val s = m.trim()
+             // (8.34) البوابة ترسل stream=. أو stream= (فارغ) لما يكون الأمر غالطًا ⇒ رابط ميت يُرفض
+             return s.isEmpty() || s == "." || s == "%2e"
            }
 
            /**
@@ -6559,74 +6655,69 @@ jobs:
            val isEp = kind == "episode"
 
            if (isEp) {
-             // (1) نفس دالة loadAndPlayEpisode: base64 {"series_id","season_num","type":"series"} + &series=<ep>
+             // (8.34) الحلقات — صيغة كود Java بالحرف: base64 {"series_id":رقم,"season_num":رقم,"type":"series"}
+             //        + &series=<رقم الحلقة>، والنوع vod أولًا (مثبت على البوابة أن series يعطي رابطًا ميتًا).
              val nums = ArrayList<Int>()
              if (snum > 0) nums.add(snum)
              val fromName = Regex("(?i)(?:موسم|season)\\s*0*(\\d{1,3})").find(seasonName)?.groupValues?.get(1)?.toIntOrNull()
              if (fromName != null && fromName > 0 && fromName != snum) nums.add(fromName)
-             nums.add(0)                     // مفتاح السرفر كما هو
-             if (nums.none { it == 1 }) nums.add(1)
+             if (nums.isEmpty()) nums.add(1)
              val msgSid = if (mid.isNotBlank()) mid else epId
+             val epNum = firstNum(epId)
              for (n in nums) {
                val b64 = seriesCmd(msgSid, sid, n)
-               val ids = ArrayList<String>()
-               if (epId.isNotBlank()) ids.add(epId)
-               val numOnly = epId.filter { it.isDigit() }
-               if (numOnly.isNotBlank() && numOnly != epId) ids.add(numOnly)
-               val types = if (ids.isEmpty()) arrayOf("vod", "series") else arrayOf("vod", "series", "itv")
-               for (id in (if (ids.isEmpty()) listOf("") else ids)) for (t in types) {
+               for (t in arrayOf("vod", "series")) {
                  var q = "type=$t&action=create_link&cmd=" + Uri.encode(b64) + "&js_price=0&forced_country="
-                 if (id.isNotBlank()) q += "&series=" + Uri.encode(id)
+                 if (epNum.isNotBlank()) q += "&series=" + Uri.encode(epNum)
                  addQuery(out, q)
                }
              }
+             // أمر الحلقة base64 كما ترسله البوابة (لو موجود) — نوع vod فقط
+             if (c0.isNotBlank() && !c0.startsWith("http") && c0.length > 24)
+               addQuery(out, "type=vod&action=create_link&cmd=" + Uri.encode(c0) + "&js_price=0&forced_country=")
            }
 
            // (8.31) **المباشر — نفس مسار التطبيق القديم**:
            //   أ) الرابط الجاهز من البوابة (فيه play_token حيّ) يُشغَّل فورًا — بلا create_link.
            //   ب) رابط بلا توكن (كاش قديم) أو أمره ليس رابطًا ⇒ create_link بصيغة MAG http://localhost/ch/<id>_.
            //   ولا نُرسل أبدًا رابطًا بتوكن قديم لـ create_link (البوابة ترد stream= فارغًا ⇒ رابط ميت).
-           val lvLink = cleanCmd(cmd)
+           // (8.34) المباشر — نفس مسار التطبيق القديم (كان يخدم): رابط جاهز بتوكن حيّ يُشغَّل فورًا،
+           //        وإلا أمر MAG حقيقي من المعرّف الرقمي عبر create_link.
            if (kind == "live") {
-             if (lvLink.startsWith("http") && (!isPortalPlayUrl(lvLink) || hasToken(lvLink)))
-               addQuery(out, done(lvLink))
-             val lvId = liveStreamId(mid, lvLink)
+             if (c0.startsWith("http") && !isPortalPlayUrl(c0)) addQuery(out, done(c0))
+             val lvId = liveStreamId(mid, c0)
              val lvMag = if (lvId.isNotBlank()) "http://localhost/ch/" + lvId + "_" else ""
              if (lvMag.isNotBlank()) for (t in arrayOf("itv", "vod"))
                addQuery(out, "type=$t&action=create_link&cmd=" + Uri.encode(lvMag) + "&js_price=0&forced_country=")
+             if (c0.isNotBlank() && !c0.startsWith("http"))
+               addQuery(out, "type=itv&action=create_link&cmd=" + Uri.encode(c0) + "&js_price=0&forced_country=")
            }
 
-           // (2) الأمر الأصلي كما هو عبر create_link (نفس playStalkerMovie)
-           if (c0.isNotBlank() && !(kind == "live" && c0.startsWith("http"))) {
-             val order = if (kind == "live") arrayOf("itv", "vod", "series") else arrayOf("vod", "itv", "series")
-             for (t in order) addQuery(out, "type=$t&action=create_link&cmd=" + Uri.encode(c0) + "&js_price=0&forced_country=")
-           }
-
-           // (3) الحلقات بلا أمر: أمر السيرفر الفعلي (من الذاكرة أولًا)
-           if (isEp && c0.isBlank()) {
-             val found = episodeCmd(if (mid.isNotBlank()) mid else epId, sid, epId)
-             if (found.isNotBlank()) for (t in arrayOf("vod", "series", "itv")) {
-               addQuery(out, "type=$t&action=create_link&cmd=" + Uri.encode(found) + "&js_price=0&forced_country=")
-             }
-           }
-
-           // (4) آخر حل: أمر MAG من المعرّف
-           val mag = Stalker.localCmd(if (isEp && epId.isNotBlank()) epId else if (mid.isNotBlank()) mid else c0)
-           if (mag.isNotBlank() && mag != c0) for (t in arrayOf("vod", "itv", "series")) {
-             addQuery(out, "type=$t&action=create_link&cmd=" + Uri.encode(mag) + "&js_price=0&forced_country=")
+           // (8.34) الأفلام — type=vod فقط (itv/series كانا يرجّعان بثًّا فارغًا 405).
+           if (kind != "live" && !isEp) {
+             // أ) أمر البوابة (base64) كما هو — مثبت: يرجع رابطًا سليمًا
+             if (c0.isNotBlank() && !c0.startsWith("http") && c0.length > 24)
+               addQuery(out, "type=vod&action=create_link&cmd=" + Uri.encode(c0) + "&js_price=0&forced_country=")
+             // ب) فلم بلا أمر (أو أمر غالط): نبني الأمر بأنفسنا من المعرّف الرقمي — مثبت على البوابة
+             val vid = firstNum(mid, epId)
+             if (vid.isNotBlank()) for (ext in arrayOf("mp4", "mkv"))
+               addQuery(out, "type=vod&action=create_link&cmd=" + Uri.encode(movieCmd(vid, ext)) + "&js_price=0&forced_country=")
            }
            // (5) **مهم للقنوات**: الأمر كما هو — لو كان رابطًا (حتى `http://localhost/ch/12_`) نصلّح
            //     المضيف ونشغّله مباشرة. هذا هو مسار «القناة تشتغل» الذي كان في 8.20 وضاع في 8.21.
-           val rawU = done(cleanCmd(cmd))
+           val rawU = done(c0)
            // (8.31) رابط بوابة بلا توكن = ميت (511) ⇒ ما نضيّعوش وقت المشغّل فيه
-           val rawDead = kind == "live" && isPortalPlayUrl(rawU) && !hasToken(rawU)
+           val rawDead = isPortalPlayUrl(rawU) && !hasToken(rawU)
            if (!rawDead && (rawU.startsWith("http://") || rawU.startsWith("https://") || rawU.startsWith("rtsp://") ||
              rawU.startsWith("udp://") || rawU.startsWith("rtmp") || rawU.startsWith("mms"))) {
              addQuery(out, rawU)
            }
-           val magU = done(mag)
-           if (magU.isNotBlank() && magU != rawU &&
-             (magU.startsWith("http://") || magU.startsWith("https://"))) addQuery(out, magU)
+           // (8.34) حارس أخير للمباشر: رابط MAG الداخلي من المعرّف الرقمي (يُصلَّح المضيف في done)
+           if (kind == "live") {
+             val lvId2 = liveStreamId(mid, c0)
+             val magU = if (lvId2.isNotBlank()) "http://localhost/ch/" + lvId2 + "_" else ""
+             if (magU.isNotBlank() && magU != rawU) addQuery(out, magU)
+           }
 
            if (out.size > 26) { val cut = ArrayList(out.subList(0, 26)); return cut }
            return out
@@ -6650,7 +6741,8 @@ jobs:
              if (u.isBlank()) {
                // بعض البوابات ترد بأمر داخلي (cmd جديد) ⇒ نعيد create_link به (نفس 8.20)
                val inner = innerCmd(r)
-               if (inner.isNotBlank() && inner != uriQ(q)) {
+               // (8.34) لا نُرسل أبدًا رابط تشغيل من البوابة كأمر (البوابة ترد stream=. ⇒ رابط ميت)
+               if (inner.isNotBlank() && inner != uriQ(q) && !isPortalPlayUrl(inner)) {
                  val t = Regex("type=([a-z]+)").find(q)?.groupValues?.get(1) ?: "vod"
                  val r2 = req("type=$t&action=create_link&cmd=" + Uri.encode(inner) + "&js_price=0&forced_country=")
                  if (r2 != null) {
@@ -7477,6 +7569,86 @@ jobs:
                android:pathData="M41,12 h3 v24 h-3 z" />
        </vector>
        NP_EOF
+       cat <<'NP_EOF' > app/src/main/res/drawable/ic_rew10.xml
+       <?xml version="1.0" encoding="utf-8"?>
+       <vector xmlns:android="http://schemas.android.com/apk/res/android"
+           android:width="24dp" android:height="24dp"
+           android:viewportWidth="24" android:viewportHeight="24">
+           <path android:fillColor="#FFFFFF"
+               android:pathData="M12,5V2L8,6l4,4V7c3.31,0 6,2.69 6,6s-2.69,6 -6,6 -6,-2.69 -6,-6H4c0,4.42 3.58,8 8,8s8,-3.58 8,-8 -3.58,-8 -8,-8z" />
+       </vector>
+       NP_EOF
+       cat <<'NP_EOF' > app/src/main/res/drawable/ic_fwd10.xml
+       <?xml version="1.0" encoding="utf-8"?>
+       <vector xmlns:android="http://schemas.android.com/apk/res/android"
+           android:width="24dp" android:height="24dp"
+           android:viewportWidth="24" android:viewportHeight="24">
+           <path android:fillColor="#FFFFFF"
+               android:pathData="M12,5V2l4,4l-4,4V7c-3.31,0 -6,2.69 -6,6s2.69,6 6,6s6,-2.69 6,-6h2c0,4.42 -3.58,8 -8,8s-8,-3.58 -8,-8 3.58,-8 8,-8z" />
+       </vector>
+       NP_EOF
+       cat <<'NP_EOF' > app/src/main/res/drawable/ic_more.xml
+       <?xml version="1.0" encoding="utf-8"?>
+       <vector xmlns:android="http://schemas.android.com/apk/res/android"
+           android:width="24dp" android:height="24dp"
+           android:viewportWidth="24" android:viewportHeight="24">
+           <path android:fillColor="#FFFFFF"
+               android:pathData="M6,10c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM12,10c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2zM18,10c-1.1,0 -2,0.9 -2,2s0.9,2 2,2 2,-0.9 2,-2 -0.9,-2 -2,-2z" />
+       </vector>
+       NP_EOF
+       cat <<'NP_EOF' > app/src/main/res/drawable/btn_ctrl.xml
+       <?xml version="1.0" encoding="utf-8"?>
+       <selector xmlns:android="http://schemas.android.com/apk/res/android">
+           <item android:state_focused="true">
+               <shape android:shape="oval">
+                   <solid android:color="#4DC8A951" />
+                   <stroke android:width="2dp" android:color="@color/np_gold" />
+               </shape>
+           </item>
+           <item android:state_pressed="true">
+               <shape android:shape="oval">
+                   <solid android:color="#66C8A951" />
+               </shape>
+           </item>
+           <item>
+               <shape android:shape="oval">
+                   <solid android:color="#59000000" />
+                   <stroke android:width="1dp" android:color="#33FFFFFF" />
+               </shape>
+           </item>
+       </selector>
+       NP_EOF
+       cat <<'NP_EOF' > app/src/main/res/drawable/btn_ctrl_main.xml
+       <?xml version="1.0" encoding="utf-8"?>
+       <selector xmlns:android="http://schemas.android.com/apk/res/android">
+           <item android:state_focused="true">
+               <shape android:shape="oval">
+                   <solid android:color="#80C8A951" />
+                   <stroke android:width="3dp" android:color="#FFFFFFFF" />
+               </shape>
+           </item>
+           <item android:state_pressed="true">
+               <shape android:shape="oval">
+                   <solid android:color="#99C8A951" />
+                   <stroke android:width="2dp" android:color="@color/np_gold" />
+               </shape>
+           </item>
+           <item>
+               <shape android:shape="oval">
+                   <solid android:color="#8A000000" />
+                   <stroke android:width="2dp" android:color="@color/np_gold" />
+               </shape>
+           </item>
+       </selector>
+       NP_EOF
+       cat <<'NP_EOF' > app/src/main/res/drawable/ctrl_panel.xml
+       <?xml version="1.0" encoding="utf-8"?>
+       <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+           <corners android:radius="26dp" />
+           <solid android:color="#B3000000" />
+           <stroke android:width="1dp" android:color="#3DFFFFFF" />
+       </shape>
+       NP_EOF
        cat <<'NP_EOF' > app/src/main/res/drawable/ic_layers.xml
        <?xml version="1.0" encoding="utf-8"?>
        <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -7986,12 +8158,8 @@ jobs:
                    android:alpha="0.85" android:focusable="true" android:clickable="true" android:visibility="gone"/>
 
                <!-- السابق / التالي الكبيران (القنوات: تبديل القناة) -->
-               <ImageView android:id="@+id/btn_prev_big" android:layout_width="58dp" android:layout_height="58dp"
-                   android:layout_gravity="end|center_vertical" android:layout_marginStart="16dp" android:layout_marginEnd="4dp"
                    android:padding="8dp" android:src="@drawable/ic_prev_big" android:alpha="0.85"
                    android:focusable="true" android:clickable="true" android:visibility="gone"/>
-               <ImageView android:id="@+id/btn_next_big" android:layout_width="58dp" android:layout_height="58dp"
-                   android:layout_gravity="start|center_vertical" android:layout_marginStart="4dp" android:layout_marginEnd="16dp"
                    android:padding="8dp" android:src="@drawable/ic_next_big" android:alpha="0.85"
                    android:focusable="true" android:clickable="true" android:visibility="gone"/>
 
@@ -8002,21 +8170,18 @@ jobs:
                    android:textStyle="bold" android:visibility="gone"/>
 
                <!-- الشريط العلوي: سهم الرجوع (>) ثم العنوان -->
-               <LinearLayout android:id="@+id/fullTop" android:layout_width="match_parent" android:layout_height="52dp" android:orientation="horizontal"
-                   android:gravity="center_vertical" android:background="@color/np_scrim" android:paddingStart="8dp" android:paddingEnd="8dp">
-                   <ImageView android:id="@+id/btn_full_close" android:layout_width="44dp" android:layout_height="44dp"
-                       android:padding="8dp" android:src="@drawable/ic_arrow_end" android:background="@drawable/circle_gold"
-                       android:focusable="true" android:clickable="true"/>
+               <LinearLayout android:id="@+id/fullTop" android:layout_width="match_parent" android:layout_height="54dp" android:orientation="horizontal"
+                   android:gravity="center_vertical" android:background="@color/np_scrim" android:paddingStart="10dp" android:paddingEnd="12dp">
+                   <ImageButton android:id="@+id/btn_full_close" android:layout_width="42dp" android:layout_height="42dp"
+                       android:padding="9dp" android:src="@drawable/ic_arrow_end" android:background="@drawable/btn_ctrl"
+                       android:contentDescription="رجوع" android:focusable="true" android:clickable="true"/>
                    <TextView android:id="@+id/full_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
                        android:layout_marginStart="12dp" android:textColor="@color/np_text" android:textSize="15sp" android:textStyle="bold" android:singleLine="true"/>
                    <TextView android:id="@+id/full_qual" android:layout_width="wrap_content" android:layout_height="wrap_content" style="@style/NovaSmall" android:layout_marginEnd="8dp"/>
-                   <Button android:id="@+id/btn_full_cast" android:layout_width="wrap_content" android:layout_height="34dp" android:text="📡"
+                   <Button android:id="@+id/btn_full_cast" android:layout_width="wrap_content" android:layout_height="34dp" android:text="إرسال"
                        android:background="@drawable/btn_ghost" android:textColor="@color/np_text" android:visibility="gone"/>
                    <Button android:id="@+id/btn_full_pip" android:layout_width="wrap_content" android:layout_height="34dp" android:layout_marginStart="6dp" android:text="بطاقة"
                        android:background="@drawable/btn_ghost" android:textColor="@color/np_text" android:visibility="gone"/>
-                   <TextView android:id="@+id/btn_full_more" android:layout_width="42dp" android:layout_height="42dp" android:layout_marginStart="6dp"
-                       android:gravity="center" android:text="⋯" android:textColor="@color/np_gold" android:textSize="20sp" android:textStyle="bold"
-                       android:background="@drawable/circle_gold" android:focusable="true" android:clickable="true"/>
                </LinearLayout>
 
                <!-- الشريط السفلي -->
@@ -8030,18 +8195,29 @@ jobs:
                        <TextView android:id="@+id/tv_full_dur" android:layout_width="52dp" android:layout_height="wrap_content" android:textColor="@color/np_text" android:textSize="12sp" android:gravity="end" android:text="0:00"/>
                    </LinearLayout>
                    <!-- صف الأزرار الاحترافية (الأفلام والحلقات فقط) -->
+                   <!-- (8.34) لوحة الأزرار الاحترافية: أيقونات دائرية + فوكس ذهبي للريموت -->
                    <LinearLayout android:id="@+id/fullBtnRow" android:layout_width="match_parent" android:layout_height="wrap_content"
-                       android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="8dp">
-                       <Button android:id="@+id/btn_full_prev" android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-                           android:text="⏮" android:textSize="17sp" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
-                       <Button android:id="@+id/btn_full_back10" android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-                           android:layout_marginStart="8dp" android:text="⏪ 10" android:textSize="15sp" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
-                       <Button android:id="@+id/btn_full_play" android:layout_width="0dp" android:layout_weight="1.4" android:layout_height="52dp"
-                           android:layout_marginStart="8dp" android:text="⏯" android:textSize="20sp" android:background="@drawable/btn_gold" android:textColor="@color/np_bg"/>
-                       <Button android:id="@+id/btn_full_fwd10" android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-                           android:layout_marginStart="8dp" android:text="⏩ 10" android:textSize="15sp" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
-                       <Button android:id="@+id/btn_full_next" android:layout_width="0dp" android:layout_weight="1" android:layout_height="44dp"
-                           android:layout_marginStart="8dp" android:text="⏭" android:textSize="17sp" android:background="@drawable/btn_ghost" android:textColor="@color/np_text"/>
+                       android:layoutDirection="ltr" android:orientation="horizontal" android:gravity="center_vertical"
+                       android:layout_marginTop="10dp" android:background="@drawable/ctrl_panel"
+                       android:paddingStart="8dp" android:paddingEnd="8dp" android:paddingTop="8dp" android:paddingBottom="8dp">
+                       <ImageButton android:id="@+id/btn_full_prev" style="@style/CtrlBtn"
+                           android:src="@drawable/ic_prev_big" android:contentDescription="السابق"/>
+                       <FrameLayout android:id="@+id/btn_full_back10" style="@style/CtrlBtnBox">
+                           <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:padding="11dp"
+                               android:layout_gravity="center" android:src="@drawable/ic_rew10" android:contentDescription="إرجاع 10 ثوان"/>
+                           <TextView style="@style/CtrlNum" android:text="10"/>
+                       </FrameLayout>
+                       <ImageButton android:id="@+id/btn_full_play" style="@style/CtrlBtnMain"
+                           android:src="@drawable/ic_play" android:contentDescription="تشغيل أو إيقاف"/>
+                       <FrameLayout android:id="@+id/btn_full_fwd10" style="@style/CtrlBtnBox">
+                           <ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:padding="11dp"
+                               android:layout_gravity="center" android:src="@drawable/ic_fwd10" android:contentDescription="تقديم 10 ثوان"/>
+                           <TextView style="@style/CtrlNum" android:text="10"/>
+                       </FrameLayout>
+                       <ImageButton android:id="@+id/btn_full_next" style="@style/CtrlBtn"
+                           android:src="@drawable/ic_next_big" android:contentDescription="التالي"/>
+                       <ImageButton android:id="@+id/btn_full_more" style="@style/CtrlBtn"
+                           android:src="@drawable/ic_more" android:contentDescription="خيارات المشغل"/>
                    </LinearLayout>
                    <!-- الصف السفلي مثل الصورة: أيقونات يسار • هوية القناة يمين -->
                    <LinearLayout android:id="@+id/fullBottomRow" android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -8525,6 +8701,47 @@ jobs:
                <item name="android:textColor">@color/np_text_dim</item>
                <item name="android:textSize">12sp</item>
            </style>
+           <!-- (8.34) أنماط لوحة أزرار المشغل الكبير: أزرار دائرية بحدّ ذهبي عند الفوكس (ريموت) -->
+           <style name="CtrlBtn">
+               <item name="android:layout_width">50dp</item>
+               <item name="android:layout_height">50dp</item>
+               <item name="android:layout_marginStart">7dp</item>
+               <item name="android:layout_marginEnd">7dp</item>
+               <item name="android:padding">12dp</item>
+               <item name="android:scaleType">fitCenter</item>
+               <item name="android:background">@drawable/btn_ctrl</item>
+               <item name="android:focusable">true</item>
+               <item name="android:clickable">true</item>
+           </style>
+           <style name="CtrlBtnBox">
+               <item name="android:layout_width">50dp</item>
+               <item name="android:layout_height">50dp</item>
+               <item name="android:layout_marginStart">7dp</item>
+               <item name="android:layout_marginEnd">7dp</item>
+               <item name="android:background">@drawable/btn_ctrl</item>
+               <item name="android:focusable">true</item>
+               <item name="android:clickable">true</item>
+           </style>
+           <style name="CtrlBtnMain">
+               <item name="android:layout_width">62dp</item>
+               <item name="android:layout_height">62dp</item>
+               <item name="android:layout_marginStart">10dp</item>
+               <item name="android:layout_marginEnd">10dp</item>
+               <item name="android:padding">16dp</item>
+               <item name="android:scaleType">fitCenter</item>
+               <item name="android:background">@drawable/btn_ctrl_main</item>
+               <item name="android:focusable">true</item>
+               <item name="android:clickable">true</item>
+           </style>
+           <style name="CtrlNum">
+               <item name="android:layout_width">wrap_content</item>
+               <item name="android:layout_height">wrap_content</item>
+               <item name="android:layout_gravity">center</item>
+               <item name="android:layout_marginTop">12dp</item>
+               <item name="android:textColor">@color/np_gold</item>
+               <item name="android:textSize">9sp</item>
+               <item name="android:textStyle">bold</item>
+           </style>
        </resources>
        NP_EOF
        cat <<'NP_EOF' > app/src/main/res/xml/file_paths.xml
@@ -8558,7 +8775,7 @@ jobs:
         echo "" >> "$GITHUB_STEP_SUMMARY"
         echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
         echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-        echo "- الحزمة: com.nova.play — الاصدار 8.33 (code 833)" >> "$GITHUB_STEP_SUMMARY"
+        echo "- الحزمة: com.nova.play — الاصدار 8.34 (code 834)" >> "$GITHUB_STEP_SUMMARY"
         echo "- اللغات: Kotlin 1.9.22 + media3 1.4.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Upload artifacts
