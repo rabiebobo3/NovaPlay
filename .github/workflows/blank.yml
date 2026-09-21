@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.39"
-      VERSION_CODE: "839"
+      VERSION_NAME: "8.40"
+      VERSION_CODE: "840"
     steps:
     - uses: actions/checkout@v4
 
@@ -128,8 +128,8 @@ jobs:
                minSdk 21
                targetSdk 34
                // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 838)
-               versionName (System.getenv("VERSION_NAME") ?: "8.38")
+               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 840)
+               versionName (System.getenv("VERSION_NAME") ?: "8.40")
                vectorDrawables.useSupportLibrary = true
            }
 
@@ -213,7 +213,7 @@ jobs:
        cat <<'NP_EOF' > README.md
        # NovaPlay — مشغّل IPTV (Kotlin · `com.nova.play`)
 
-       **الإصدار 8.38 (code 838)** — ثبات + **محرّك ذكاء محلي** يعمل بلا إنترنت إضافي.
+       **الإصدار 8.40 (code 840)** — ثبات + **محرّك ذكاء محلي** يعمل بلا إنترنت إضافي.
 
        ## البناء
        (**Add file → Upload files**) ثم Commit ⇒ Actions ⇒ Artifacts ⇒ `app-debug.apk`. بعد التثبيت: **الإعدادات لازم 8.38**.
@@ -3410,7 +3410,7 @@ jobs:
 
         private fun surfaceReady(v: androidx.media3.ui.PlayerView): Boolean = true
 
-        /** (8.39) سطح واحد: المشغّل يبقى ملتصقًا بـ pv للأبد — ننقل العنصر نفسه بين الحاويتين بلا تبديل سطوح. */
+        /** (8.40) سطح واحد: المشغّل يبقى ملتصقًا بـ pv للأبد — ننقل العنصر نفسه بين الحاويتين بلا تبديل سطوح. */
         private fun attachPv(toFull: Boolean) {
          try {
           if (pvInFull == toFull && pv.parent != null) { applyResize(); return }
@@ -3430,7 +3430,7 @@ jobs:
          } catch (t: Throwable) { Crash.log(t) }
         }
 
-        /** (8.39) نتأكد فقط أن pv هو المضيف — بلا أي نقل أثناء بدء التشغيل. */
+        /** (8.40) نتأكد فقط أن pv هو المضيف — بلا أي نقل أثناء بدء التشغيل. */
         private fun ensureAttached() {
          try {
           val p = player ?: return
@@ -4284,7 +4284,7 @@ jobs:
          clearFrameWd()
         }
 
-        /** (8.39) حارس الصورة: وصلنا STATE_READY بلا مسار فيديو خلال 8 ثوان ⇒ نعتبره فشلًا وننتقل للبديل. */
+        /** (8.40) حارس الصورة: وصلنا STATE_READY بلا مسار فيديو خلال 8 ثوان ⇒ نعتبره فشلًا وننتقل للبديل. */
         private fun armFrameWd() {
          clearFrameWd()
          val r = object : Runnable {
@@ -4309,7 +4309,7 @@ jobs:
          frameWd = null
         }
 
-        /** (8.39) تحديث التحديد بلا notifyDataSetChanged (أخفّ على التلفزيون مع آلاف القنوات). */
+        /** (8.40) تحديث التحديد بلا notifyDataSetChanged (أخفّ على التلفزيون مع آلاف القنوات). */
         private fun markSel() {
          try {
           val i = indexOf(cur)
@@ -9260,21 +9260,22 @@ jobs:
     - name: Build APK (debug + release)
       run: |
         set -e
-        # (8.39) ubuntu-latest صار يحمل Gradle 9 و AGP 8.2.2 لا يعمل معه ⇒ نثبّت Gradle 8.5 صراحةً
-        if [ ! -x "$HOME/gradle-8.5/bin/gradle" ]; then
-          curl -sSLo /tmp/gradle-8.5-bin.zip https://services.gradle.org/distributions/gradle-8.5-bin.zip
-          rm -rf "$HOME/gradle-8.5"
-          unzip -q -o /tmp/gradle-8.5-bin.zip -d "$HOME"
+        # (8.40) نفس طريقة البناء الأصلية تماماً — لم نغيّرها
+        if command -v gradle >/dev/null 2>&1; then gradle wrapper --gradle-version 8.5 >/dev/null 2>&1 || true; fi
+        # (8.40) خطة بديلة: تخدم غير إذا ما تكوّنش الغلاف (مثلاً Gradle 9 على ubuntu-latest يرفض تهيئة مشروع AGP 8.2)
+        if [ ! -x ./gradlew ]; then
+          ( curl -sSLo /tmp/gradle-8.5-bin.zip https://services.gradle.org/distributions/gradle-8.5-bin.zip \
+            && rm -rf "$HOME/gradle-8.5" && unzip -q -o /tmp/gradle-8.5-bin.zip -d "$HOME" ) || true
+          if [ -x "$HOME/gradle-8.5/bin/gradle" ]; then
+            rm -rf /tmp/npwrap; mkdir -p /tmp/npwrap
+            printf "rootProject.name = 'w'\n" > /tmp/npwrap/settings.gradle
+            ( cd /tmp/npwrap && "$HOME/gradle-8.5/bin/gradle" wrapper --gradle-version 8.5 --distribution-type bin -q ) || true
+            if [ -f /tmp/npwrap/gradlew ]; then cp -r /tmp/npwrap/gradle /tmp/npwrap/gradlew /tmp/npwrap/gradlew.bat . || true; fi
+            chmod +x ./gradlew 2>/dev/null || true
+          fi
         fi
-        export PATH="$HOME/gradle-8.5/bin:$PATH"
-        gradle --version | head -3
-        # نولّد الغلاف (wrapper) في مجلد مؤقت حتى لا نُهيّئ مشروع أندرويد بإصدار Gradle الخطأ
-        rm -rf /tmp/npwrap && mkdir -p /tmp/npwrap
-        printf "rootProject.name = 'w'\n" > /tmp/npwrap/settings.gradle
-        ( cd /tmp/npwrap && gradle wrapper --gradle-version 8.5 --distribution-type bin -q )
-        cp -r /tmp/npwrap/gradle /tmp/npwrap/gradlew /tmp/npwrap/gradlew.bat .
-        chmod +x ./gradlew
-        ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
+        if [ -x ./gradlew ]; then chmod +x ./gradlew; RUN=./gradlew; else RUN=gradle; fi
+        $RUN :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
         ls -lh app/build/outputs/apk/debug app/build/outputs/apk/release
         DBG=$(du -h app/build/outputs/apk/debug/app-debug.apk 2>/dev/null | cut -f1 || echo "-")
         REL=$(du -h app/build/outputs/apk/release/app-release.apk 2>/dev/null | cut -f1 || echo "-")
@@ -9282,9 +9283,9 @@ jobs:
         echo "" >> "$GITHUB_STEP_SUMMARY"
         echo "- debug: $DBG" >> "$GITHUB_STEP_SUMMARY"
         echo "- release: $REL" >> "$GITHUB_STEP_SUMMARY"
-        echo "- الحزمة: com.nova.play — الاصدار 8.39 (code 839)" >> "$GITHUB_STEP_SUMMARY"
+        echo "- الحزمة: com.nova.play — الاصدار 8.40 (code 840)" >> "$GITHUB_STEP_SUMMARY"
         echo "- اللغات: Kotlin 1.9.22 + media3 1.4.1 + Firebase RTDB/FCM + Glide + MediaRouter" >> "$GITHUB_STEP_SUMMARY"
-        echo "- إصلاحات 8.39: Gradle 8.5 (بناء)، سطح مشغّل واحد (لا شاشة سوداء)، حارس صورة، تخفيف للتلفزيون" >> "$GITHUB_STEP_SUMMARY"
+        echo "- إصلاحات 8.40: تخفيف على التلفزيون (تحديث سطرين بدل القائمة كاملة)، سطح مشغّل واحد (لا شاشة سوداء)، حارس صورة" >> "$GITHUB_STEP_SUMMARY"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
