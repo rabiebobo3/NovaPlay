@@ -4,7 +4,45 @@ name: NovaPlay_Kotlin_Full
 # كل ميزات Rabie Pro v138 SmartLoad منقولة إلى Kotlin هنا، بدون أي ملف مضغوط غامض.
 #
 # ============================================================================
-#  v8.39 — نفس كودك تمامًا + 17 تعديلًا جراحيًا فقط (بلا حذف أي ميزة)
+#  v8.40.2 — المرحلة الثانية: تسريع جلب البيانات من السرفر — 12 تعديلًا جراحيًا
+#           (المجموع الآن 53 تعديلًا) — بلا حذف أي ميزة.
+#
+#  السبب: كل طلب بوابة كان يفتح اتصالًا جديدًا (مصافحة كاملة)، وكل قسم كان يُجلب صفحة بعد
+#  صفحة، والأقسام كانت تُجلب واحدًا بعد الآخر، وواجهة الأفلام/المسلسلات كانت تنتظر حتى آخر
+#  صفحة قبل أن تُظهر شيئًا. هذا كله هو «بطء جلب البيانات من السرفر».
+#
+#  ① صفحات قنوات البث (0..3) تُجلب الآن بالتوازي ثم تُدمج بنفس الترتيب (كانت 4 مصافحات متتالية).
+#  ② أقسام (بث/أفلام/مسلسلات) تُجلب بالتوازي بدل 3 مصافحات متتالية.
+#  ③ fillCat(): صفحات كل قسم تُجلب 3 معًا (دمج مرتّب ⇒ نفس القائمة ونفس إزالة المكرر).
+#  ④ bgFillAll(): بناء القائمة الأولي بـ3 أقسام متوازية بدل قسم واحد في كل مرة.
+#  ⑤⑥ عرض تدريجي: كل دفعة صفحات تصل تظهر عناصرها فورًا في شبكة الأفلام/المسلسلات.
+#  ⑦ تجديد توكن البوابة استباقيًا في الخلفية بعد 15 دقيقة ⇒ لا انتظار مصافحة عند فتح قسم/تشغيل.
+#  ⑧ قياس زمن كل طلب في سطر التشخيص (lastReq) ⇒ ترى التحسّن بالرقم.
+#  ⑨ عمر الرابط المجهّز مسبقًا: 120 ث ← 300 ث (تنقّل أسرع بين القنوات).
+#  لم يُمسّ: الدقة/البتريت، ولا أي ميزة أو زر أو تخطيط أو قائمة أو فحص.
+#
+# ============================================================================
+#  v8.40.1 — المرحلة الأولى من «التعديلات الكاملة»: 13 تعديلًا جراحيًا إضافيًا
+#           (المجموع الآن 41 تعديلًا) — بلا حذف أي ميزة، وبلا أي تغيير في الشكل.
+#
+#  (أ) سرعة جلب البيانات : keep-alive — كان كل طلب بوابة يرسل Connection: close فيفتح اتصال
+#      TCP/SSL جديدًا (مصافحة كاملة) لكل طلب. الآن يُعاد استخدام الاتصال (مفتاح تراجع: KEEPALIVE840).
+#  (ب) الصورة الواقفة    : WifiLock عالي الأداء أثناء التجهيز/التشغيل + WAKE_MODE_NETWORK ⇒ النظام
+#      لم يبقَ يُنيم راديو الواي فاي/المعالج فيتوقّف البث على أجهزة TV. يُحرَّر عند التوقّف/الخروج.
+#  (ج) الصورة المجمّدة   : لا يُبقي آخر إطار على الشاشة عند الفشل (كان يبدو «متجمّدًا» بلا مؤشّر)
+#      + خلفية سوداء. التدقيق الذاتي liveGuard/liveRecover يبقى كما هو.
+#  (د) حصرية الصوت       : AudioAttributes (USAGE_MEDIA/CONTENT_TYPE_MOVIE) + احترام تركيز الصوت
+#      ⇒ لا يختلط صوتنا بتطبيق آخر. (للتراجع: الوسيط الثاني false في buildPlayer)
+#  (هـ) الريموت/الواجهة  : تهيئة RecyclerView (بلا أنيميشن إدخال + كاش عرض أكبر) ⇒ تمرير أنعم.
+#  لم يُمسّ الدقة/البتريت إطلاقًا (بطلبك) — ولا أي زر أو قائمة أو تخطيط أو ميزة.
+#
+# ============================================================================
+#  v8.39.1 — نفس كودك تمامًا + 28 تعديلًا جراحيًا فقط (بلا حذف أي ميزة)
+#
+#  v8.39.1 (إصلاح مسجَّل من سجل أعطالك): كان صوت قناة يعمل وأنت تشاهد فيلمًا/حلقة لأن نتيجة
+#  شبكة متأخرة (تجهيز/تجديد رابط) كانت تبدأ التشغيل في نسخة قديمة من شاشة التشغيل في الخلفية.
+#  الآن: نسخة واحدة فقط «معروضة» يحقّ لها بدء التشغيل (onResume)، وعند بدء عنصر جديد تُسكَت
+#  بقية نسخ شاشة التشغيل (pause + stop)، وإصلاح ما بعد العودة/تجديد الجلسة محكوم بالنسخة المعروضة.
 #  إصلاح مشكلتي Android TV / قوقل تفي:
 #   (1) الثقل وبطء الريموت بعد الخروج من التطبيق والعودة إليه:
 #       • لم يبقَ كاش الصور (Glide) يُمحى عند ذهاب التطبيق للخلفية — كان أول سبب للثقل.
@@ -37,8 +75,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.39"
-      VERSION_CODE: "839"
+      VERSION_NAME: "8.40.2"
+      VERSION_CODE: "8402"
     steps:
     - uses: actions/checkout@v4
 
@@ -147,8 +185,8 @@ jobs:
                minSdk 21
                targetSdk 34
                // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 839)
-               versionName (System.getenv("VERSION_NAME") ?: "8.39")
+               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 8402)
+               versionName (System.getenv("VERSION_NAME") ?: "8.40.2")
                vectorDrawables.useSupportLibrary = true
            }
 
@@ -1342,7 +1380,9 @@ jobs:
                return try {
                    val pair = pre.remove(keyOf(c)) ?: return ""
                    val (u, ts) = pair
-                   if (System.currentTimeMillis() - ts > 120_000L) return ""
+                   // (8.40.2) كان 120 ثانية؛ التجهيز المسبق يوفّر طلبًا كاملًا عند التنقّل السريع بين
+                   // القنوات، ولا خطر من عمر أطول لأن أي رابط مرفوض يعالجه المسار الذاتي في 8.39/8.39.1.
+                   if (System.currentTimeMillis() - ts > 300_000L) return ""
                    if (!online(u)) return ""
                    Crash.note("AI-PRE", "استعملنا رابطًا مجهّزًا مسبقًا ⇒ بداية فورية: " + c.name.take(40))
                    u
@@ -1649,6 +1689,10 @@ jobs:
 
        object Http {
         const val UA = "Mozilla/5.0 (Linux; Android 12) NovaPlay/8.2 IPTV-Client"
+        // (8.40.1) keep-alive: كان كل طلب بوابة يرسل Connection: close ⇒ اتصال TCP/SSL جديد لكل طلب
+        // (مصافحة كاملة + بطء في «فتح قسم» و«تشغيل قناة»). الآن يُعاد استخدام الاتصال تلقائيًا.
+        // للتراجع فقط: اجعل القيمة false فيعود السلوك القديم حرفيًا بلا أي تغيير آخر.
+        const val KEEPALIVE840 = true
 
 
         fun read(url: String, headers: Map<String, String> = emptyMap(), timeoutMs: Int = 16000, retries: Int = 1): String {
@@ -1664,7 +1708,8 @@ jobs:
            c.instanceFollowRedirects = true
            c.setRequestProperty("User-Agent", UA)
            c.setRequestProperty("Accept-Encoding", "gzip")
-           c.setRequestProperty("Connection", "close")
+           // (8.40.1) إعادة استخدام الاتصال (keep-alive) — للرجوع: KEEPALIVE840 = false
+           if (!KEEPALIVE840) c.setRequestProperty("Connection", "close")
            for ((k, v) in headers) c.setRequestProperty(k, v)
            val code = c.responseCode
            if (code in 300..399) {
@@ -1929,6 +1974,15 @@ jobs:
          val span = Math.max(3, resources.displayMetrics.widthPixels / (resources.displayMetrics.density * 130).toInt())
          rvGrid.layoutManager = GridLayoutManager(this, span)
          rvCats.layoutManager = LinearLayoutManager(this)
+         // (8.40.1) نفس التهيئة لشبكة الأفلام/المسلسلات وأقسامها ⇒ التمرير بالريموت لا «يقطع».
+         try {
+          rvGrid.setItemAnimator(null)
+          rvGrid.setHasFixedSize(true)
+          rvGrid.setItemViewCacheSize(30)
+          rvGrid.recycledViewPool.setMaxRecycledViews(0, 40)
+          rvCats.setItemAnimator(null)
+          rvCats.setHasFixedSize(true)
+         } catch (t: Throwable) { Crash.log(t) }
          adapter = CardAdapter()
          rvGrid.adapter = adapter
 
@@ -2069,7 +2123,24 @@ jobs:
          }
          showBusy(true, "جلب «" + g.name + "» بكل صفحاته…")
          val out = ArrayList<Channel>()
-         Loader.macFillCat(this, p, kind, g.catId, g.name, out) { n ->
+         // (8.40.2) عرض تدريجي: كل دفعة صفحات تصل تُظهر عناصرها فورًا في الشبكة (بدل انتظار طويل).
+         // تُستدعى على خيط الواجهة من Loader، والاستدعاء النهائي أسفله ما زال يعمل كما هو (نفس النتيجة).
+         val onBatch840: (List<Channel>) -> Unit = { snap ->
+          try {
+           if (!inEpisodes && !isFinishing) {
+            val keep = ArrayList<Channel>()
+            for (c0 in cat) if (c0.catId != g.catId) keep.add(c0)
+            cat.clear(); cat.addAll(keep); cat.addAll(snap)
+            for (i0 in cat.indices) cat[i0].num = i0 + 1
+            g.count = snap.size
+            all.clear(); all.addAll(cat)
+            applyFilter()
+            try { rvCats.adapter?.notifyDataSetChanged() } catch (t2: Throwable) {}
+            showBusy(true, "«" + g.name + "» … " + snap.size + " عنصر حتى الآن")
+           }
+          } catch (t2: Throwable) { Crash.log(t2) }
+         }
+         Loader.macFillCat(this, p, kind, g.catId, g.name, out, onBatch840) { n ->
           try {
            showBusy(false, "")
            if (n == 0) { toast("لا عناصر في هذا القسم عند السيرفر"); return@macFillCat }
@@ -2764,6 +2835,14 @@ jobs:
 
        class LiveActivity : AppCompatActivity(), Player.Listener {
 
+        companion object {
+         /** (8.39.1) كل نسخ شاشة التشغيل الحيّة — لإسكات أي نسخة أخرى عند بدء عنصر جديد. */
+         private val insts39 = java.util.concurrent.CopyOnWriteArrayList<LiveActivity>()
+
+         /** (8.39.1) النسخة المعروضة حاليًا (وحدها يحقّ لها بدء أو استئناف التشغيل). */
+         @Volatile private var shown39: LiveActivity? = null
+        }
+
         private var player: ExoPlayer? = null
         private var cur: Channel? = null
         private var usingAlt = false
@@ -2791,6 +2870,8 @@ jobs:
         private var lastTapAt = 0L
         private var wasPlayingBeforeStop = false
         private var wantRemain = false
+         /** (8.39.1) هل هذه النسخة هي المعروضة الآن (onResume)? */
+         private var onTop39 = false
         /** (8.39) منع تكرار تجديد جلسة البوابة. */
         private var tokenHealing = false
         private var lastTokenFix = 0L
@@ -2882,6 +2963,7 @@ jobs:
 
         override fun onCreate(b: Bundle?) {
          super.onCreate(b)
+         try { insts39.add(this) } catch (t: Throwable) {}
          try {
           initScreen()
          } catch (t: Throwable) {
@@ -2959,6 +3041,9 @@ jobs:
 
         override fun onResume() {
          super.onResume()
+         // (8.39.1) هذه هي النسخة التي أمامك الآن ⇒ وحدها يحقّ لها بدء أو استئناف التشغيل.
+         onTop39 = true
+         shown39 = this
          goImmersive()
          keepAwake()
          receiver = Events.register(this) { type, text ->
@@ -2977,6 +3062,8 @@ jobs:
          } catch (t: Throwable) {}
          // (8.39) إيقاف مؤقّت التحديث (كل 500 مللي) أثناء الخلفية — كان يعمل بلا فائدة ويستهلك المعالج.
          try { stopTicker() } catch (t: Throwable) {}
+         // (8.40.1) تحرير قفل الشبكة عند ذهاب النشاط للخلفية (التشغيل متوقّف أصلًا هنا).
+         netLock840(false)
          super.onStop()
         }
 
@@ -3005,6 +3092,7 @@ jobs:
         }
 
         override fun onPause() {
+         onTop39 = false
          savePosNow()
          Events.unregister(this, receiver); receiver = null
          try { pv.keepScreenOn = false } catch (t: Throwable) {}
@@ -3015,6 +3103,50 @@ jobs:
          try { pv.keepScreenOn = true } catch (t: Throwable) {}
         }
 
+        /** (8.40.1) قفل راديو الواي فاي عالي الأداء أثناء التشغيل فقط. */
+        private var wifiLock840: android.net.wifi.WifiManager.WifiLock? = null
+
+        /**
+         * (8.40.1) سبب «الصورة واقفة» الأول على أجهزة Android TV: النظام يُنيم راديو الواي فاي عند
+         * الخمول فيتوقّف تدفّق البيانات من السرفر حتى يعود الراديو (ثانية أو أكثر) ⇒ تجمّد ثم استئناف.
+         * هذا القفل يُؤخذ أثناء التجهيز/التشغيل ويُحرَّر عند التوقّف أو الخروج أو إسكات هذه النسخة،
+         * فلا استهلاك إضافي في الخلفية. لا يمسّ أي ميزة (البث عبر الكيبل/الإيثرنت يعمل كما هو).
+         */
+        @Suppress("DEPRECATION")
+        private fun netLock840(on: Boolean) {
+         try {
+          val wm = applicationContext.getSystemService(android.content.Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+          if (on) {
+           if (wifiLock840 == null && wm != null) {
+            val mode = if (android.os.Build.VERSION.SDK_INT >= 29)
+             android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_POWER
+            else
+             android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF
+            wifiLock840 = wm.createWifiLock(mode, "nova:play840")
+           }
+           val l = wifiLock840
+           if (l != null && !l.isHeld) l.acquire()
+          } else {
+           val l = wifiLock840
+           if (l != null && l.isHeld) l.release()
+          }
+         } catch (t: Throwable) { Crash.log(t) }
+        }
+
+
+        /** (8.39.1) إسكات هذه النسخة فورًا — تُستدعى من النسخة المعروضة عند بدء عنصر جديد. */
+        private fun hush39() {
+         try {
+          wasPlayingBeforeStop = false
+          player?.setPlayWhenReady(false)
+          player?.pause()
+          player?.stop()
+          // (8.40.1) نسخة مُسكتة في الخلفية لا تُبقي قفل الشبكة أبدًا.
+          netLock840(false)
+          if (pipOn) showPip(false)
+         } catch (t: Throwable) { Crash.log(t) }
+        }
+
 
         /**
          * (8.39) بعد العودة إلى التطبيق: إن كان العنصر الحالي من البوابة (أو توقّف المشغّل) نجدّد جلسة
@@ -3023,6 +3155,8 @@ jobs:
          */
         private fun fixAfterReturn() {
          try {
+          // (8.39.1) لا نصلح ولا نُشغّل إلا للنسخة التي أمام المستخدم الآن.
+          if (!onTop39 || shown39 !== this) return
           if (!wasPlayingBeforeStop) return
           val c = cur ?: return
           val pl = player ?: return
@@ -3042,6 +3176,7 @@ jobs:
          val nowR = System.currentTimeMillis()
          if (tokenHealing) return
          if (nowR - lastTokenFix < 15000L) return          // لا نكرّرها أكثر من مرة كل 15 ثانية
+         if (!onTop39 || shown39 !== this) return          // (8.39.1) لا نجدد لنسخة غير معروضة
          tokenHealing = true
          lastTokenFix = nowR
          try { StalkerSession.get(p).renew() } catch (t: Throwable) { Crash.log(t) }
@@ -3049,16 +3184,23 @@ jobs:
          Loader.macPlayable(p, c) { u ->
           tokenHealing = false
           try { busy(false, "") } catch (t: Throwable) {}
-          val pl = player
-          if (u.isNotBlank() && u != c.url) {
-           Crash.note("PLAY-FIX", "رابط جديد بعد تجديد جلسة البوابة — kind=" + c.kind)
-           c.url = u
-           resolvedLive = true
-           startPlayback(c, u, full)
-          } else if (pl != null) {
-           retrySame(pl, "توكن منتهٍ")
+          // ===== (8.39.1) الحماية الأهم =====
+          // إن غادر المستخدم هذه الشاشة قبل وصول الرابط: نحدّث الرابط فقط ولا نبدأ تشغيلًا في الخلفية
+          // (هكذا لا تسمع صوت قناة أثناء مشاهدة فيلم أو حلقة في شاشة أخرى).
+          if (!onTop39 || shown39 !== this || isFinishing || isDestroyed) {
+           try { if (u.isNotBlank()) c.url = u } catch (t: Throwable) {}
+          } else {
+           val pl = player
+           if (u.isNotBlank() && u != c.url) {
+            Crash.note("PLAY-FIX", "رابط جديد بعد تجديد جلسة البوابة — kind=" + c.kind)
+            c.url = u
+            resolvedLive = true
+            startPlayback(c, u, full)
+           } else if (pl != null) {
+            retrySame(pl, "توكن منتهٍ")
+           }
           }
-         }
+          }
         }
 
 
@@ -3117,12 +3259,16 @@ jobs:
         }
 
         override fun onDestroy() {
+         try { if (shown39 === this) shown39 = null } catch (t: Throwable) {}
+         try { insts39.remove(this) } catch (t: Throwable) {}
          savePosNow()
          stopTicker(); clearWd()
          try { player?.removeListener(this) } catch (t: Throwable) {}
          try { player?.release() } catch (t: Throwable) {}
          player = null
          try { pv.player = null; pvFull.player = null } catch (t: Throwable) {}
+         // (8.40.1) تحرير نهائي عند إغلاق الشاشة.
+         netLock840(false)
          super.onDestroy()
         }
 
@@ -3195,13 +3341,30 @@ jobs:
           .setSeekBackIncrementMs(10000L)
           .setSeekForwardIncrementMs(10000L)
           .setHandleAudioBecomingNoisy(true)
+          // (8.40.1) يمنع نوم المعالج أثناء التجهيز/التشغيل (WAKE_MODE_NETWORK) ⇒ لا انقطاع بيانات
+          // أثناء «جاري التحميل» على أجهزة TV. يُحرَّر تلقائيًا عند التوقّف أو الخطأ.
+          .setWakeMode(C.WAKE_MODE_NETWORK)
           .build()
          p.playWhenReady = true
+         // (8.40.1) حصرية الصوت: نُعلن أنّ صوتنا «وسائط/فيلم» ونحترم تركيز الصوت في النظام ⇒ لا يختلط
+         // صوتنا بصوت تطبيق آخر، ويتوقّف عند تنبيه/مكالمة ثم يستأنف. للتراجع: الوسيط الثاني false.
+         try {
+          p.setAudioAttributes(
+           androidx.media3.common.AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+            .build(), true)
+         } catch (t: Throwable) { Crash.log(t) }
          player = p
          try { pv.setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER) } catch (t: Throwable) {}
          try { pvFull.setShowBuffering(androidx.media3.ui.PlayerView.SHOW_BUFFERING_NEVER) } catch (t: Throwable) {}
-         try { pv.setKeepContentOnPlayerReset(true) } catch (t: Throwable) {}
-         try { pvFull.setKeepContentOnPlayerReset(true) } catch (t: Throwable) {}
+         // (8.40.1) كان آخر إطار يبقى على الشاشة عند أي فشل/إعادة تحضير ⇒ «صورة واقفة» بلا مؤشّر.
+         // الآن شاشة سوداء + شارت التحميل/الانقطاع الموجود عندك ⇒ المستخدم يفهم ما يجري، والتدقيق
+         // الذاتي (liveGuard/liveRecover) يبقى كما هو بلا أي تغيير.
+         try { pv.setKeepContentOnPlayerReset(false) } catch (t: Throwable) {}
+         try { pvFull.setKeepContentOnPlayerReset(false) } catch (t: Throwable) {}
+         try { pv.setShutterBackgroundColor(android.graphics.Color.BLACK) } catch (t: Throwable) {}
+         try { pvFull.setShutterBackgroundColor(android.graphics.Color.BLACK) } catch (t: Throwable) {}
          pv.player = p
          pv.useController = false
          applyResize()
@@ -3419,6 +3582,19 @@ jobs:
 
         private fun startPlayback(c: Channel, url: String, asFull: Boolean) {
          val p = player ?: return
+         // ===== (8.39.1) لا نبدأ تشغيلًا من نسخة غير معروضة =====
+         // كان هذا سبب سماع صوت قناة وأنت تشاهد فيلمًا/حلقة: نتيجة شبكة متأخرة (تجهيز رابط أو تجديد
+         // جلسة البوابة) تصل إلى نسخة قديمة من شاشة التشغيل بعد أن غادرتها ⇒ يبدأ البث وصوته يعمل فوق
+         // صوت ما تشاهده. الآن: إن وُجدت نسخة أخرى هي المعروضة، تُتجاهل هذه النتيجة تمامًا.
+         try {
+          if (isFinishing || isDestroyed) return
+          val o = shown39
+          if (o != null && o !== this && o.onTop39) {
+           Crash.note("BG-SKIP", "تجاهلنا تشغيلًا في نسخة غير معروضة: " + c.name.take(40))
+           return
+          }
+          for (o2 in insts39) if (o2 !== this) o2.hush39()
+         } catch (t: Throwable) { Crash.log(t) }
          Ai.playStart()
          try {
           Crash.note("PLAY-URL", c.kind + " | " + (if (url.length > 190) url.substring(0, 190) else url) +
@@ -4170,6 +4346,8 @@ jobs:
 
         override fun onPlaybackStateChanged(state: Int) {
          val p = player ?: return
+         // (8.40.1) القفل أثناء التجهيز/التشغيل، ويُحرَّر عند التوقّف أو نهاية العنصر.
+         if (state == Player.STATE_BUFFERING || state == Player.STATE_READY) netLock840(true) else netLock840(false)
          when (state) {
           Player.STATE_BUFFERING -> {
            busyFlash?.let { h.removeCallbacks(it) }
@@ -4224,6 +4402,8 @@ jobs:
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+         // (8.40.1) قفل الشبكة يُؤخذ أثناء التشغيل ويُحرَّر عند الإيقاف/الإسكات ⇒ بلا استهلاك زائد.
+         netLock840(isPlaying)
          updateCenterPlay()
          if (isPlaying) {
           dockBusy.visibility = View.GONE; fullBusy.visibility = View.GONE
@@ -5052,6 +5232,16 @@ jobs:
 
          rvChannels.layoutManager = LinearLayoutManager(this)
          rvGroups.layoutManager = LinearLayoutManager(this)
+         // (8.40.1) تهيئة RecyclerView: بلا أنيميشن إدخال (كان يقطع حركة التركيز بالريموت) + كاش عرض
+         // أكبر ⇒ تمرير أنعم واستجابة أسرع. لا تغيير في الشكل ولا في المقاسات ولا في الألوان.
+         try {
+          rvChannels.setItemAnimator(null)
+          rvChannels.setHasFixedSize(true)
+          rvChannels.setItemViewCacheSize(30)
+          rvChannels.recycledViewPool.setMaxRecycledViews(0, 40)
+          rvGroups.setItemAnimator(null)
+          rvGroups.setHasFixedSize(true)
+         } catch (t: Throwable) { Crash.log(t) }
          chanAdapter = ChanAdapter()
          grpAdapter = GrpAdapter()
          rvChannels.adapter = chanAdapter
@@ -6115,6 +6305,8 @@ jobs:
         /** (8.39) وقت آخر مصافحة ناجحة — لكشف التوكن المنتهي بعد الخروج من التطبيق. */
         @Volatile private var tokenAt = 0L
         @Volatile private var healing = false
+        /** (8.40.2) يمنع تكرار التجديد الاستباقي للتوكن في الخلفية. */
+        @Volatile private var preRenew840 = false
         /** (8.39) وقت آخر علاج ذاتي للتوكن — لمنع تكرار المصافحة عند خطأ متكرر من البوابة. */
         @Volatile private var lastHealAt = 0L
         var accountStatus = ""
@@ -6261,6 +6453,7 @@ jobs:
          for (v in variants) for (pth in paths) {
           variant = v
           try {
+           val t0r840 = System.currentTimeMillis()          // (8.40.2) لقياس زمن كل طلب في سطر التشخيص
            val r = Http.read(base + pth + "?" + q, headers(auth), timeoutMs = 15000, retries = 1)
            val t = r.trimStart()
            if (r.isNotBlank() && (t.startsWith("{") || t.startsWith("["))) {
@@ -6284,7 +6477,7 @@ jobs:
                if (r2.isNotBlank() && (t2.startsWith("{") || t2.startsWith("[")) &&
                 !r2.lowercase().contains("authorization failed")) {
                 loadPath = pth; probed = true
-                lastReq = q + " ⇒ ok بعد تجديد التوكن(" + r2.length + ")"
+                lastReq = q + " ⇒ ok بعد تجديد التوكن(" + r2.length + " في " + (System.currentTimeMillis() - t0r840) + "مللي)"
                 healing = false
                 return r2
                }
@@ -6292,7 +6485,7 @@ jobs:
              } catch (t2: Throwable) { Crash.log(t2) } finally { healing = false }
             }
             loadPath = pth; probed = true
-            lastReq = q + " ⇒ ok(" + r.length + ")"
+            lastReq = q + " ⇒ ok(" + r.length + " في " + (System.currentTimeMillis() - t0r840) + "مللي)"
             return r
            }
            err = "رد غير JSON: " + r.take(40)
@@ -6420,7 +6613,23 @@ jobs:
          // (8.39) كان الشرط: (probed && token.isNotEmpty) فقط. وبعد الخروج من التطبيق يبقى التوكن القديم
          // في الذاكرة فترفض البوابة كل create_link ⇒ «الأقسام تُحمَّل لكن القنوات والأفلام والحلقات لا
          // تعمل». الآن نتحقق من عمر التوكن ونجدّده عند انتهائه (بقية المنطق كما هو بلا تغيير).
-         if (probed && token.isNotEmpty() && tokenFresh()) return true
+         if (probed && token.isNotEmpty() && tokenFresh()) {
+          // (8.40.2) تجديد استباقي في الخلفية قبل انتهاء التوكن (بعد 15 دقيقة): نُبطل «طزاجة» الوقت
+          // مؤقتًا فيجري الـhandshake في الخلفية بينما التوكن القديم ما زال صالحًا ⇒ لا تنتظر مصافحة
+          // عند فتح قسم أو تشغيل قناة. إن فشل التجديد نُعيد الحالة كما كانت (لا يتعطّل شيء).
+          if (!preRenew840 && System.currentTimeMillis() - tokenAt > 15L * 60_000L) {
+           preRenew840 = true
+           Bg.pool.execute {
+            try {
+             val keepAt = tokenAt
+             tokenAt = 0L
+             Crash.note("TOKEN-PRE", "تجديد استباقي للتوكن في الخلفية (قبل انتهائه)")
+             if (!connect()) { tokenAt = keepAt; probed = true }
+            } catch (t: Throwable) { Crash.log(t) } finally { preRenew840 = false }
+           }
+          }
+          return true
+         }
          val qs = listOf(
           "type=stb&action=handshake&pre_auth=1&mac=" + Uri.encode(mac),
           "type=stb&action=handshake&token=&mac=" + Uri.encode(mac),
@@ -6509,9 +6718,19 @@ jobs:
          }
          var n = 0
          val seen = HashSet<String>()
+         // (8.40.2) كانت الصفحات 0..3 تُجلب واحدة بعد الأخرى (4 مصافحات متتالية) ⇒ الآن تُجلب بالتوازي
+         // ثم تُدمج بنفس ترتيب الصفحات ⇒ نفس النتيجة حرفيًا ونفس الترتيب، لكن في زمن صفحة واحدة تقريبًا.
+         val pgAr840 = arrayOfNulls<org.json.JSONArray>(4)
+         val pgLat840 = java.util.concurrent.CountDownLatch(4)
+         val pgPool840 = Executors.newFixedThreadPool(4)
+         for (pg in 0..3) pgPool840.execute {
+          try { val rr = req("type=itv&action=get_all_channels&number=$pg"); if (rr != null) pgAr840[pg] = itemsOf(rr) }
+          catch (t: Throwable) { Crash.log(t) } finally { pgLat840.countDown() }
+         }
+         try { pgLat840.await(60, java.util.concurrent.TimeUnit.SECONDS) } catch (t: Throwable) {}
+         pgPool840.shutdown()
          for (page in 0..3) {
-          val r = req("type=itv&action=get_all_channels&number=$page") ?: break
-          val arr = itemsOf(r)
+          val arr = pgAr840[page] ?: break
           if (arr.length() == 0) break
           val addedBefore = n
           for (i in 0 until arr.length()) {
@@ -6654,32 +6873,69 @@ jobs:
          return out.size
         }
 
-        fun fillCat(kind: String, genreId: String, catName: String, maxPages: Int, out: MutableList<Channel>): Int {
+        fun fillCat(kind: String, genreId: String, catName: String, maxPages: Int, out: MutableList<Channel>, onBatch: ((List<Channel>) -> Unit)? = null): Int {
          val type = if (kind == "movie") "vod" else "series"
-         var p = 1
          var pages = 0
          var added = 0
          val seen = HashSet<String>()
          for (c in out) seen.add(c.id + "|" + c.name)
-         while (p <= maxPages) {
-          val r = page(type, genreId, p, "") ?: break
-          val arr = itemsOf(r)
-          if (arr.length() == 0) break
-          val before = added
-          for (i in 0 until arr.length()) {
-           val o = arr.optJSONObject(i) ?: continue
-           val c = toChannel(o, kind, catName, genreId, out.size + 1)
-           if (c.kind == "series") c.mid = c.id
-           if (!seen.add(c.id + "|" + c.name)) continue
-           out.add(c); added++
-           if (out.size >= MAX_ITEMS) return added
-          }
-          if (pages == 0) pages = pagesOf(r)
-          if (added == before) break
-          if (arr.length() < PAGE_MIN) break
-          if (pages > 0 && p >= pages) break
-          p++
+
+         // (8.40.2) الصفحة الأولى كما هي (منها نعرف عدد الصفحات من السيرفر)، وبعدها تُجلب بقية الصفحات
+         // بالتوازي (3 معًا) وتُدمج بترتيب أرقام الصفحات ⇒ نفس القائمة ونفس إزالة المكرر بالحرف،
+         // لكن الزمن يقارب الثلث (كانت مصافحة كاملة لكل صفحة على حدة).
+         val first = page(type, genreId, 1, "") ?: return 0
+         val arr1 = itemsOf(first)
+         if (arr1.length() == 0) return 0
+         for (i in 0 until arr1.length()) {
+          val o = arr1.optJSONObject(i) ?: continue
+          val c = toChannel(o, kind, catName, genreId, out.size + 1)
+          if (c.kind == "series") c.mid = c.id
+          if (!seen.add(c.id + "|" + c.name)) continue
+          out.add(c); added++
+          if (out.size >= MAX_ITEMS) return added
          }
+         pages = pagesOf(first)
+         // (8.40.2) عرض تدريجي: نُرسل نسخة من العناصر التي وصلت (لا تُقرأ القائمة من خيط آخر).
+         if (onBatch != null) { try { onBatch(ArrayList(out)) } catch (t: Throwable) { Crash.log(t) } }
+         if (arr1.length() < PAGE_MIN) return added
+         if (pages > 0 && 1 >= pages) return added
+
+         val last = if (pages > 0) minOf(pages, maxPages) else maxPages
+         val pool = Executors.newFixedThreadPool(3)
+         var p = 2
+         while (p <= last) {
+          val to = minOf(last, p + 2)
+          val chunk = ArrayList<Int>()
+          for (q in p..to) chunk.add(q)
+          val got = java.util.concurrent.ConcurrentHashMap<Int, org.json.JSONArray>()
+          val lat = java.util.concurrent.CountDownLatch(chunk.size)
+          for (q in chunk) pool.execute {
+           try { val r = page(type, genreId, q, ""); if (r != null) got[q] = itemsOf(r) }
+           catch (t: Throwable) { Crash.log(t) } finally { lat.countDown() }
+          }
+          try { lat.await(120, java.util.concurrent.TimeUnit.SECONDS) } catch (t: Throwable) {}
+          var stop = false
+          val addedBeforeChunk = added
+          for (q in chunk) {
+           val arr = got[q]
+           if (arr == null || arr.length() == 0) { stop = true; break }
+           for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val c = toChannel(o, kind, catName, genreId, out.size + 1)
+            if (c.kind == "series") c.mid = c.id
+            if (!seen.add(c.id + "|" + c.name)) continue
+            out.add(c); added++
+            if (out.size >= MAX_ITEMS) { stop = true; break }
+           }
+           if (stop) break
+           if (arr.length() < PAGE_MIN) { stop = true; break }
+          }
+          if (onBatch != null) { try { onBatch(ArrayList(out)) } catch (t: Throwable) { Crash.log(t) } }
+          if (added == addedBeforeChunk) break
+          if (stop) break
+          p = to + 1
+         }
+         pool.shutdown()
          return added
         }
 
@@ -7580,9 +7836,21 @@ jobs:
          if (!st.connect()) throw java.io.IOException(st.lastError.ifBlank { "تعذّر الاتصال بالبوابة" })
          if (st.mac.isBlank()) throw java.io.IOException("MAC غير صحيح")
          progress("أقسام البث والأفلام والمسلسلات…")
-         Catalog.liveCats.clear(); Catalog.liveCats.addAll(st.liveCategories())
-         Catalog.movieCats.clear(); Catalog.movieCats.addAll(st.categories("vod"))
-         Catalog.seriesCats.clear(); Catalog.seriesCats.addAll(st.categories("series"))
+         // (8.40.2) كانت الأقسام الثلاثة تُجلب واحدًا بعد الآخر (3 مصافحات متتالية) ⇒ الآن بالتوازي،
+         // بنفس النتيجة ونفس الترتيب تمامًا.
+         var lc840: List<Group> = ArrayList()
+         var mc840: List<Group> = ArrayList()
+         var sc840: List<Group> = ArrayList()
+         val cLat840 = java.util.concurrent.CountDownLatch(3)
+         val cPool840 = Executors.newFixedThreadPool(3)
+         cPool840.execute { try { lc840 = st.liveCategories() } catch (t: Throwable) { Crash.log(t) } finally { cLat840.countDown() } }
+         cPool840.execute { try { mc840 = st.categories("vod") } catch (t: Throwable) { Crash.log(t) } finally { cLat840.countDown() } }
+         cPool840.execute { try { sc840 = st.categories("series") } catch (t: Throwable) { Crash.log(t) } finally { cLat840.countDown() } }
+         try { cLat840.await(90, java.util.concurrent.TimeUnit.SECONDS) } catch (t: Throwable) {}
+         cPool840.shutdown()
+         Catalog.liveCats.clear(); Catalog.liveCats.addAll(lc840)
+         Catalog.movieCats.clear(); Catalog.movieCats.addAll(mc840)
+         Catalog.seriesCats.clear(); Catalog.seriesCats.addAll(sc840)
          progress("قنوات البث المباشر…")
          st.channels(Catalog.live)
          Catalog.expiry = if (st.accountStatus.isBlank()) Catalog.expiry else ("حالة الحساب: " + st.accountStatus)
@@ -7623,25 +7891,39 @@ jobs:
            val plan = ArrayList<Pair<String, Group>>()
            for (g in ArrayList(Catalog.movieCats)) plan.add("movie" to g)
            for (g in ArrayList(Catalog.seriesCats)) plan.add("series" to g)
-           var n = 0
-           for (pr in plan) {
-            if (mySeq != bgSeq || cancel) break
-            if (Catalog.movie.size + Catalog.series.size >= 80_000) break
-            val kind = pr.first; val g = pr.second
-            if (g.catId.isBlank() || Catalog.fillState(kind, g.catId) != 0) { n++; continue }
-            Catalog.fillSet(kind, g.catId, 1)
-            val tmp = ArrayList<Channel>()
-            try { st.fillCat(kind, g.catId, g.name, 400, tmp) } catch (t: Throwable) { Crash.log(t) }
-            appendCat(kind, g.catId, g.name, tmp)
-            Catalog.fillSet(kind, g.catId, 2)
-            n++
-            Catalog.bgMsg = "$n/${plan.size} قسم • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل"
-            Catalog.status = "${Catalog.live.size} قناة • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل"
-            if (n % 2 == 0) {
-             Events.send(ctx, "catalog")
-             try { Thread.sleep(120) } catch (e: Throwable) {}
+           // (8.40.2) كان القسم يُجلب واحدًا بعد الآخر (وكل قسم صفحاته متتالية) ⇒ بناء القائمة الأولي
+           // بطيء جدًا. الآن 3 أقسام بالتوازي، وكل قسم يجلب صفحاته بالتوازي أيضًا (fillCat) ⇒ أقصر
+           // بمرات. نفس المنطق: نفس حالات الأقسام (fillState) ونفس الرسائل ونفس التحديث التدريجي.
+           val idx840 = java.util.concurrent.atomic.AtomicInteger(0)
+           val doneN840 = java.util.concurrent.atomic.AtomicInteger(0)
+           val cap840 = java.util.concurrent.atomic.AtomicBoolean(false)
+           val wn840 = minOf(3, maxOf(1, plan.size))
+           val th840 = ArrayList<Thread>()
+           for (w840 in 0 until wn840) {
+            val th = Thread {
+             while (true) {
+              if (mySeq != bgSeq || cancel || cap840.get()) break
+              val i840 = idx840.getAndIncrement()
+              if (i840 >= plan.size) break
+              val kind = plan[i840].first
+              val g = plan[i840].second
+              if (g.catId.isBlank() || Catalog.fillState(kind, g.catId) != 0) { doneN840.incrementAndGet(); continue }
+              if (Catalog.movie.size + Catalog.series.size >= 80_000) { cap840.set(true); break }
+              Catalog.fillSet(kind, g.catId, 1)
+              val tmp = ArrayList<Channel>()
+              try { st.fillCat(kind, g.catId, g.name, 400, tmp) } catch (t: Throwable) { Crash.log(t) }
+              if (tmp.isNotEmpty()) { try { appendCat(kind, g.catId, g.name, tmp) } catch (t: Throwable) { Crash.log(t) } }
+              Catalog.fillSet(kind, g.catId, 2)
+              val n = doneN840.incrementAndGet()
+              Catalog.bgMsg = "$n/${plan.size} قسم • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل"
+              Catalog.status = "${Catalog.live.size} قناة • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل"
+              if (n % 2 == 0) { try { Events.send(ctx, "catalog") } catch (t: Throwable) {} }
+             }
             }
+            th.isDaemon = true
+            th.start(); th840.add(th)
            }
+           for (th in th840) { try { th.join() } catch (t: Throwable) {} }
            Catalog.status = "${Catalog.live.size} قناة • ${Catalog.movie.size} فيلم • ${Catalog.series.size} مسلسل"
            saveCache(ctx, p)
            Events.send(ctx, "catalog")
@@ -7709,13 +7991,19 @@ jobs:
         }
 
 
-        fun macFillCat(ctx: Context, p: Profile, kind: String, catId: String, catName: String, out: MutableList<Channel>, cb: (Int) -> Unit) {
+        fun macFillCat(ctx: Context, p: Profile, kind: String, catId: String, catName: String, out: MutableList<Channel>, onBatch: ((List<Channel>) -> Unit)? = null, cb: (Int) -> Unit) {
          Bg.pool.execute {
           var n = 0
           try {
            if (Catalog.fillState(kind, catId) == 0) Catalog.fillSet(kind, catId, 1)
            val st = StalkerSession.get(p)
-           if (st.connect()) n = st.fillCat(kind, catId, catName, 400, out)
+           // (8.40.2) عرض تدريجي: كل دفعة صفحات تصل تُرسل نسخة منها إلى الواجهة (على خيط الواجهة) بدل
+           // الانتظار حتى آخر صفحة. لم يُحذف شيء — الاستدعاء النهائي cb(n) ما زال كما هو تمامًا.
+           // (ترتيب البارامترات: onBatch قبل cb حتى تبقى اللامبدا الأخيرة للمستدعي = cb كما كانت)
+           val stream840: ((List<Channel>) -> Unit)? = if (onBatch == null) null else { snap ->
+            onBatch?.let { ob -> try { Bg.ui { ob(snap) } } catch (t: Throwable) {} }
+           }
+           if (st.connect()) n = st.fillCat(kind, catId, catName, 400, out, stream840)
            else Catalog.status = st.lastError
            Catalog.fillSet(kind, catId, 2)
           } catch (t: Throwable) { Crash.log(t) }
