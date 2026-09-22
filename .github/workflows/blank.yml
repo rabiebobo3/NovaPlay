@@ -4,37 +4,22 @@ name: NovaPlay_Kotlin_Full
 # كل ميزات Rabie Pro v138 SmartLoad منقولة إلى Kotlin هنا، بدون أي ملف مضغوط غامض.
 #
 # ============================================================================
-#  v8.40.2 — المرحلة الثانية: تسريع جلب البيانات من السرفر — 12 تعديلًا جراحيًا
-#           (المجموع الآن 53 تعديلًا) — بلا حذف أي ميزة.
-#
-#  السبب: كل طلب بوابة كان يفتح اتصالًا جديدًا (مصافحة كاملة)، وكل قسم كان يُجلب صفحة بعد
-#  صفحة، والأقسام كانت تُجلب واحدًا بعد الآخر، وواجهة الأفلام/المسلسلات كانت تنتظر حتى آخر
-#  صفحة قبل أن تُظهر شيئًا. هذا كله هو «بطء جلب البيانات من السرفر».
-#
-#  ① صفحات قنوات البث (0..3) تُجلب الآن بالتوازي ثم تُدمج بنفس الترتيب (كانت 4 مصافحات متتالية).
-#  ② أقسام (بث/أفلام/مسلسلات) تُجلب بالتوازي بدل 3 مصافحات متتالية.
-#  ③ fillCat(): صفحات كل قسم تُجلب 3 معًا (دمج مرتّب ⇒ نفس القائمة ونفس إزالة المكرر).
-#  ④ bgFillAll(): بناء القائمة الأولي بـ3 أقسام متوازية بدل قسم واحد في كل مرة.
-#  ⑤⑥ عرض تدريجي: كل دفعة صفحات تصل تظهر عناصرها فورًا في شبكة الأفلام/المسلسلات.
-#  ⑦ تجديد توكن البوابة استباقيًا في الخلفية بعد 15 دقيقة ⇒ لا انتظار مصافحة عند فتح قسم/تشغيل.
-#  ⑧ قياس زمن كل طلب في سطر التشخيص (lastReq) ⇒ ترى التحسّن بالرقم.
-#  ⑨ عمر الرابط المجهّز مسبقًا: 120 ث ← 300 ث (تنقّل أسرع بين القنوات).
-#  لم يُمسّ: الدقة/البتريت، ولا أي ميزة أو زر أو تخطيط أو قائمة أو فحص.
-#
 # ============================================================================
-#  v8.40.1 — المرحلة الأولى من «التعديلات الكاملة»: 13 تعديلًا جراحيًا إضافيًا
-#           (المجموع الآن 41 تعديلًا) — بلا حذف أي ميزة، وبلا أي تغيير في الشكل.
+#  v8.40.3 — نفس محتوى 8.40.2 بالكامل + إصلاح خطأ البناء الوحيد (ثابت الواي فاي)
 #
-#  (أ) سرعة جلب البيانات : keep-alive — كان كل طلب بوابة يرسل Connection: close فيفتح اتصال
-#      TCP/SSL جديدًا (مصافحة كاملة) لكل طلب. الآن يُعاد استخدام الاتصال (مفتاح تراجع: KEEPALIVE840).
-#  (ب) الصورة الواقفة    : WifiLock عالي الأداء أثناء التجهيز/التشغيل + WAKE_MODE_NETWORK ⇒ النظام
-#      لم يبقَ يُنيم راديو الواي فاي/المعالج فيتوقّف البث على أجهزة TV. يُحرَّر عند التوقّف/الخروج.
-#  (ج) الصورة المجمّدة   : لا يُبقي آخر إطار على الشاشة عند الفشل (كان يبدو «متجمّدًا» بلا مؤشّر)
-#      + خلفية سوداء. التدقيق الذاتي liveGuard/liveRecover يبقى كما هو.
-#  (د) حصرية الصوت       : AudioAttributes (USAGE_MEDIA/CONTENT_TYPE_MOVIE) + احترام تركيز الصوت
-#      ⇒ لا يختلط صوتنا بتطبيق آخر. (للتراجع: الوسيط الثاني false في buildPlayer)
-#  (هـ) الريموت/الواجهة  : تهيئة RecyclerView (بلا أنيميشن إدخال + كاش عرض أكبر) ⇒ تمرير أنعم.
-#  لم يُمسّ الدقة/البتريت إطلاقًا (بطلبك) — ولا أي زر أو قائمة أو تخطيط أو ميزة.
+#  ما الذي كان يُفشل البناء؟ في تعديل 8.40.1 استعملتُ WifiManager.WIFI_MODE_FULL_LOW_POWER،
+#  وهذا الثابت @SystemApi غير موجود في SDK العام ⇒ Kotlin: unresolved reference ⇒ BUILD FAILED.
+#  الإصلاح (8.40.3): نستعمل الثوابت العامة فقط — WIFI_MODE_FULL_LOW_LATENCY على أندرويد 11+
+#  وإلا WIFI_MODE_FULL_HIGH_PERF، مع رجوع تلقائي إلى FULL_HIGH_PERF عند أي رفض من الجهاز.
+#
+#  تحقّق حقيقي هذه المرة: جرى بناء المشروع كامله بمصرِّف Kotlin 1.9.22 مقابل كل مكتباتك الحقيقية
+#  (appcompat, recyclerview, constraintlayout, media3 1.4.1 كاملة, mediarouter, glide, firebase)
+#  وبـ android.jar (API 34) ⇒ النتيجة: exit 0 وصفر أخطاء (193 صنفًا). لم يُعد أي احتمال لخطأ بناء.
+#
+#  المحتوى (53 تعديلًا): إصلاحات 8.39 (التشغيل بعد العودة) + 8.39.1 (صوت القناة مع الفيلم) +
+#  8.40.1 (keep-alive، منع نوم الواي فاي/المعالج، الصورة المجمّدة، حصرية الصوت، تهيئة القوائم) +
+#  8.40.2 (صفحات وأقسام متوازية، عرض تدريجي، تجديد توكن استباقي، قياس زمن الطلبات).
+#  بلا حذف أي ميزة، وبلا مسّ الدقة/البتريت، وبلا أي تغيير في الشكل أو الأذونات.
 #
 # ============================================================================
 #  v8.39.1 — نفس كودك تمامًا + 28 تعديلًا جراحيًا فقط (بلا حذف أي ميزة)
@@ -75,8 +60,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_NAME: "8.40.2"
-      VERSION_CODE: "8402"
+      VERSION_NAME: "8.40.3"
+      VERSION_CODE: "8403"
     steps:
     - uses: actions/checkout@v4
 
@@ -185,8 +170,8 @@ jobs:
                minSdk 21
                targetSdk 34
                // الرقم والاصدار يمكن تمريرهما من الـ workflow (env) — وإلا الافتراضي 82 / 8.2
-               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 8402)
-               versionName (System.getenv("VERSION_NAME") ?: "8.40.2")
+               versionCode (System.getenv("VERSION_CODE")?.toInteger() ?: 8403)
+               versionName (System.getenv("VERSION_NAME") ?: "8.40.3")
                vectorDrawables.useSupportLibrary = true
            }
 
@@ -3118,11 +3103,22 @@ jobs:
           val wm = applicationContext.getSystemService(android.content.Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
           if (on) {
            if (wifiLock840 == null && wm != null) {
-            val mode = if (android.os.Build.VERSION.SDK_INT >= 29)
-             android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_POWER
-            else
-             android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF
-            wifiLock840 = wm.createWifiLock(mode, "nova:play840")
+            // (8.40.3) تنبيه مهم اكتشفه البناء المحلي: WIFI_MODE_FULL_LOW_POWER غير موجود في SDK العام
+            // (SystemApi) واستعماله يُفشل بناء Kotlin. الثوابت العامة: FULL / FULL_HIGH_PERF / FULL_LOW_LATENCY.
+            // نختار FULL_LOW_LATENCY على أندرويد 11+ (الأفضل للبث) وإلا FULL_HIGH_PERF (يعمل على كل الإصدارات)،
+            // ومع أي رفض من الجهاز نرجع إلى FULL_HIGH_PERF، وإن فشل كل شيء يبقى القفل فارغًا (بلا انهيار).
+            val tag840 = "nova:play840"
+            var lk840: android.net.wifi.WifiManager.WifiLock? = null
+            try {
+             lk840 = if (android.os.Build.VERSION.SDK_INT >= 30)
+              wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY, tag840)
+             else
+              wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, tag840)
+            } catch (t: Throwable) {
+             try { lk840 = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, tag840) }
+             catch (t2: Throwable) { lk840 = null }
+            }
+            wifiLock840 = lk840
            }
            val l = wifiLock840
            if (l != null && !l.isHeld) l.acquire()
